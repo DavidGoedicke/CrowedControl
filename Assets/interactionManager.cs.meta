@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3dff8be00b94b4444b7335ef81ecf17a
+timeCreated: 1470773541
+licenseType: Free
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences:
+  - LineHostPrefab: {instanceID: 0}
+  - box: {fileID: 2800000, guid: 2159fd0c43afe401c9b54912cd600998, type: 3}
+  - arrow: {fileID: 2800000, guid: 25815600c5d404adbb1db3655c247977, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
