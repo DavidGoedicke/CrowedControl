@@ -137,7 +137,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
                         math.normalizesafe(alignDirection)*alignWeight+
                         math.normalizesafe(groupingCenter-pos.Value)*groupingWeight)
 
-                        * 0.1f) + (0.9f * vel.Value))
+                        * deltaTime) + ((1- deltaTime) * vel.Value)) //ToDo: Need to adjust this to react to delta time (i.e. how fast can they rotate
                 };
                 vel.Value.y = 0;
 
