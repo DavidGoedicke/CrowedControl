@@ -6,7 +6,8 @@ using Unity.Burst;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
-
+using Unity.Physics;
+using Unity.Physics.Systems;
 
 
 
@@ -51,7 +52,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
             {
                 pos = new AgentPosition
                 {
-                    Value = new float3(temp.NextFloat(-25, 25), 1, temp.NextFloat(-50, 50))
+                    Value = new float3(temp.NextFloat(-10, 10), 1, temp.NextFloat(-10, 10))
                 };
                 vel = new AgentDirection
                 {
@@ -72,32 +73,35 @@ public partial class AgentSystem_IJobChunk : SystemBase
        
         var positionMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
         var directionMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+        
         var initialPosArrayJobHandle = Entities
                     .WithAll<WalkingTag>()
                     .WithName("InitPosMemorySeparationJob")
-                    .ForEach((int entityInQueryIndex, in AgentPosition pos,in AgentDirection dir) =>
+                    .ForEach((int entityInQueryIndex, in LocalToWorld pos) =>
                     {
-                        positionMemory[entityInQueryIndex] = pos.Value;
-                        directionMemory[entityInQueryIndex] = dir.Value;
+                        
+                        positionMemory[entityInQueryIndex] = pos.Position;
+                        directionMemory[entityInQueryIndex] = pos.Forward;// pos.Forward;
                     })
                     .ScheduleParallel(Dependency);
- 
+       
+        
         float deltaTime = Time.DeltaTime;
         var steerJob = Entities
             .WithName("Steer")
             .WithReadOnly(positionMemory)
             .WithReadOnly(directionMemory)
             .WithAll<WalkingTag>()
-            .ForEach((ref AgentPosition pos, ref AgentDirection vel) =>//in AgentInfo agent
+            .ForEach((ref ApplyImpulse impulse, in LocalToWorld pos) =>//in AgentInfo agent
             {
-                        float minRaduis = 0.75f;
-                float aviodWeight = 0.7f;
+                float minRaduis = 3.5f;
+                float aviodWeight = 2f;
 
-                        float maxAlignRadius = 4.5f;
+                float maxAlignRadius = 10.5f;
                 float alignWeight = 0.21f;
 
-                        float maxGroupingRadius = 18.0f;
-                float groupingWeight = 0.18f;
+                float maxGroupingRadius = 50.0f;
+                float groupingWeight = 0.25f;
 
                 uint avoidCount = 0;
                 float3 avoidVector = float3.zero;
@@ -106,16 +110,16 @@ public partial class AgentSystem_IJobChunk : SystemBase
                 uint groupingCount = 0;
                 float3 groupingCenter = float3.zero;
                 for (int i = 0; i < positionMemory.Length; i++) {
-                    float distance = math.lengthsq(pos.Value - positionMemory[i]);
+                    float distance = math.lengthsq(pos.Position - positionMemory[i]);
                     if (distance <= 0) { continue; } //cheap way of skipping our own 
-                    else if(distance>=0 && distance < minRaduis)
+                    else if (distance >= 0 && distance < minRaduis)
                     {
-                        avoidVector += pos.Value - positionMemory[i];
+                        avoidVector += pos.Position - positionMemory[i];
                         avoidCount++;
                     }
                     else if (distance > minRaduis && distance < maxGroupingRadius)
                     {
-                        if(distance> maxAlignRadius)
+                        if (distance > maxAlignRadius)
                         {
                             alignDirection += directionMemory[i];
                             alignCount++;
@@ -128,44 +132,27 @@ public partial class AgentSystem_IJobChunk : SystemBase
                 alignDirection /= alignCount;
                 avoidVector /= avoidCount;
 
-                
 
-                vel = new AgentDirection
+                float3 newValue = math.normalizesafe(
+                    (math.normalizesafe(avoidVector) * aviodWeight +
+                    math.normalizesafe(alignDirection) * alignWeight +
+                    math.normalizesafe(groupingCenter - pos.Position) * groupingWeight));
+                newValue.y = 0;
+
+                impulse = new ApplyImpulse
                 {
-                    Value = math.normalizesafe((
-                        (math.normalizesafe(avoidVector) * aviodWeight +
-                        math.normalizesafe(alignDirection)*alignWeight+
-                        math.normalizesafe(groupingCenter-pos.Value)*groupingWeight)
-
-                        * deltaTime) + ((1- deltaTime) * vel.Value)) //ToDo: Need to adjust this to react to delta time (i.e. how fast can they rotate
+                    Direction = newValue
                 };
-                vel.Value.y = 0;
-
-                pos = new AgentPosition
-                {
-                    Value = pos.Value + vel.Value * deltaTime
-                };
+               
+               
             })
            .ScheduleParallel(initialPosArrayJobHandle);
 
         positionMemory.Dispose(steerJob);
         directionMemory.Dispose(steerJob);
-        var movingJob = Entities
-            .WithName("Moving")
-            .WithAll<WalkingTag>()
-            .ForEach((ref LocalToWorld localToWorld, in AgentPosition pos,in AgentDirection dir) =>//in AgentInfo agent
-            {
-                localToWorld = new LocalToWorld
-                {
-                    Value = float4x4.TRS(
-                                new float3(pos.Value) ,
-                                quaternion.LookRotationSafe(dir.Value, math.up()),
-                                new float3(1.0f, 1.0f, 1.0f))
-                };
-            })
-            .ScheduleParallel(steerJob);
-
-        Dependency = movingJob;
+        
+       
+        Dependency = steerJob;
 
 
     }

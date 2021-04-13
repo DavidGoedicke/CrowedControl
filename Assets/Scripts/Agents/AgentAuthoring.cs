@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Physics;
+using Unity.Physics.Systems;
 
 
 public struct WasBornTag : IComponentData{ }
@@ -11,6 +13,7 @@ public struct ArrivedTag : IComponentData{ }
 public struct AgentSpeed : IComponentData { public float Value; }
 public struct AgentPosition : IComponentData {  public float3 Value; }
 public struct AgentDirection : IComponentData { public float3 Value; }
+public struct ApplyImpulse : IComponentData {  public float3 Direction;}
 
 
 
@@ -25,7 +28,7 @@ public class AgentAuthoring : MonoBehaviour, IConvertGameObjectToEntity
     // Fields are used to populate Entity data
     public float speed = 3.0f;
 
-
+    
     /// <summary>
     /// A function which converts our Guard authoring GameObject to a more optimized Entity representation
     /// </summary>
@@ -41,8 +44,10 @@ public class AgentAuthoring : MonoBehaviour, IConvertGameObjectToEntity
                 typeof(WasBornTag),
                 typeof(AgentSpeed),
                 typeof(AgentPosition),
-                typeof(AgentDirection)
+                typeof(AgentDirection),
+                typeof(ApplyImpulse)
             }));
         dstManager.SetComponentData(entity, new AgentSpeed { Value = speed });
+        
     }
 }
