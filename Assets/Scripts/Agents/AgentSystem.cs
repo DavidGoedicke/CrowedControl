@@ -48,7 +48,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
             .WithName("Initialize")
             .WithAll<WasBornTag>()
             .WithBurst(FloatMode.Default, FloatPrecision.Standard, true)
-            .ForEach((Entity entity, int entityInQueryIndex, ref AgentPosition pos, ref AgentDirection vel) =>
+            .ForEach((Entity entity, int entityInQueryIndex,ref AgentPosition pos, ref AgentDirection vel,ref PhysicsMass mass) =>
             {
                 pos = new AgentPosition
                 {
@@ -62,6 +62,10 @@ public partial class AgentSystem_IJobChunk : SystemBase
                 vel.Value.y = 0;
                 commandBuffer.RemoveComponent<WasBornTag>(entityInQueryIndex,entity);
                 commandBuffer.AddComponent<WalkingTag>(entityInQueryIndex, entity);
+                mass.InverseInertia[0] = 0;
+                mass.InverseInertia[2] = 0;
+
+
             })
             .ScheduleParallel();
             m_EntityCommandBufferSystem.AddJobHandleForProducer(Dependency);
@@ -94,14 +98,14 @@ public partial class AgentSystem_IJobChunk : SystemBase
             .WithAll<WalkingTag>()
             .ForEach((ref ApplyImpulse impulse, in LocalToWorld pos) =>//in AgentInfo agent
             {
-                float minRaduis = 3.5f;
-                float aviodWeight = 2f;
+                float minRaduis = 1.5f;
+                float aviodWeight = 0.9f;
 
-                float maxAlignRadius = 10.5f;
-                float alignWeight = 0.21f;
+                float maxAlignRadius = 25f;
+                float alignWeight = 0.8f;
 
-                float maxGroupingRadius = 50.0f;
-                float groupingWeight = 0.25f;
+                float maxGroupingRadius = 100.0f;
+                float groupingWeight = 0.2f;
 
                 uint avoidCount = 0;
                 float3 avoidVector = float3.zero;
@@ -110,7 +114,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
                 uint groupingCount = 0;
                 float3 groupingCenter = float3.zero;
                 for (int i = 0; i < positionMemory.Length; i++) {
-                    float distance = math.lengthsq(pos.Position - positionMemory[i]);
+                    float distance = math.length(pos.Position - positionMemory[i]);
                     if (distance <= 0) { continue; } //cheap way of skipping our own 
                     else if (distance >= 0 && distance < minRaduis)
                     {
@@ -119,7 +123,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
                     }
                     else if (distance > minRaduis && distance < maxGroupingRadius)
                     {
-                        if (distance > maxAlignRadius)
+                        if (distance < maxAlignRadius)
                         {
                             alignDirection += directionMemory[i];
                             alignCount++;

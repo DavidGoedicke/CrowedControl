@@ -5,11 +5,12 @@ using Unity.Physics;
 using Unity.Physics.Extensions;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Transforms;
 
 /// <summary> Our simple system. </summary>
-[UpdateAfter(typeof(Unity.Physics.Systems.EndFramePhysicsSystem))]
+//[UpdateAfter(typeof(Unity.Physics.Systems.EndFramePhysicsSystem))]
 [UpdateAfter(typeof(AgentSystem_IJobChunk))]
-public class ApplyImpulseOnKeySystem : SystemBase
+public class ApplyAgentMotion : SystemBase
 {
 
     protected override void OnUpdate()
@@ -23,13 +24,26 @@ public class ApplyImpulseOnKeySystem : SystemBase
             Entity _entity,
             ref PhysicsVelocity _physicsVelocity,
             ref PhysicsMass _physicsMass,
-            in ApplyImpulse _applyImpulseOnKeyData) =>
+            in ApplyImpulse _applyImpulseOnKeyData,
+            in LocalToWorld ltw,
+            in AgentSpeed speed) =>
         {
             
                 int rigidbodyIndex = physicsWorld.GetRigidBodyIndex(_entity);
 
-                /// Apply a linear impulse to the entity.
-                PhysicsComponentExtensions.ApplyLinearImpulse(ref _physicsVelocity, _physicsMass, _applyImpulseOnKeyData.Direction * 0.5f);
+            /// Apply a linear impulse to the entity.
+            
+            PhysicsComponentExtensions.ApplyLinearImpulse(ref _physicsVelocity, _physicsMass, _applyImpulseOnKeyData.Direction * 0.5f);
+            if (math.length(_physicsVelocity.Linear) > speed.Value)
+            {
+                float3 temp = _physicsVelocity.Linear;
+                temp = math.normalize(temp) * speed.Value;
+                _physicsVelocity.Linear = temp;
+            }
+
+             quaternion TargertOrientation = quaternion.LookRotationSafe(_applyImpulseOnKeyData.Direction, math.up());
+           quaternion angularchange = math.mul(TargertOrientation, math.inverse(quaternion.LookRotationSafe(ltw.Forward,math.up())));
+            PhysicsComponentExtensions.ApplyAngularImpulse(ref _physicsVelocity, _physicsMass, new float3 (0,angularchange.value.y * 0.05f, 0));
 
         }).Run();
     }
