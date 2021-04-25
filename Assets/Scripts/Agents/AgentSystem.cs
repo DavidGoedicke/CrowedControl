@@ -46,7 +46,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
         var temp = new Unity.Mathematics.Random(1);
         Entities
             .WithName("Initialize")
-            .WithAll<WasBornTag>()
+            .WithAny<WasBornTag>()
             .WithBurst(FloatMode.Default, FloatPrecision.Standard, true)
             .ForEach((Entity entity, int entityInQueryIndex,ref AgentPosition pos, ref AgentDirection vel,ref PhysicsMass mass) =>
             {
@@ -77,7 +77,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
        
         var positionMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
         var directionMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-        
+        var SignMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
         var initialPosArrayJobHandle = Entities
                     .WithAll<WalkingTag>()
                     .WithName("InitPosMemorySeparationJob")
@@ -88,8 +88,20 @@ public partial class AgentSystem_IJobChunk : SystemBase
                         directionMemory[entityInQueryIndex] = pos.Forward;// pos.Forward;
                     })
                     .ScheduleParallel(Dependency);
-       
-        
+
+        var getGateDirection = Entities
+                    .WithAny<GateNumber,TargetGate>()
+                    .WithName("GetGateDirection")
+                    .ForEach((Entity entity, int entityInQueryIndex, in Physics pos) =>
+                    {
+
+                        SignMemory[entityInQueryIndex]
+
+
+                    })
+                    .ScheduleParallel(initialPosArrayJobHandle);
+
+
         float deltaTime = Time.DeltaTime;
         var steerJob = Entities
             .WithName("Steer")
@@ -150,12 +162,12 @@ public partial class AgentSystem_IJobChunk : SystemBase
                
                
             })
-           .ScheduleParallel(initialPosArrayJobHandle);
+           .ScheduleParallel(getGateDirection);
 
         positionMemory.Dispose(steerJob);
         directionMemory.Dispose(steerJob);
-        
-       
+        SignMemory.Dispose(steerJob);
+
         Dependency = steerJob;
 
 

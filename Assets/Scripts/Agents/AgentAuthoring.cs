@@ -7,6 +7,8 @@ using Unity.Physics;
 using Unity.Physics.Systems;
 
 
+public enum GateNums { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, NONE }
+
 public struct WasBornTag : IComponentData{ }
 public struct WalkingTag : IComponentData{ }
 public struct ArrivedTag : IComponentData{ }
@@ -14,6 +16,9 @@ public struct AgentSpeed : IComponentData { public float Value; }
 public struct AgentPosition : IComponentData {  public float3 Value; }
 public struct AgentDirection : IComponentData { public float3 Value; }
 public struct ApplyImpulse : IComponentData {  public float3 Direction;}
+
+public struct TargetGate : IComponentData { public GateNums value; }
+public struct HasFixedTarget : IComponentData { public Entity value; }
 
 
 
@@ -28,6 +33,7 @@ public class AgentAuthoring : MonoBehaviour, IConvertGameObjectToEntity
     // Fields are used to populate Entity data
     public float speed = 3.0f;
 
+    public GateNums SelectTargetGate = GateNums.A;
     
     /// <summary>
     /// A function which converts our Guard authoring GameObject to a more optimized Entity representation
@@ -45,9 +51,12 @@ public class AgentAuthoring : MonoBehaviour, IConvertGameObjectToEntity
                 typeof(AgentSpeed),
                 typeof(AgentPosition),
                 typeof(AgentDirection),
-                typeof(ApplyImpulse)
+                typeof(ApplyImpulse),
+                typeof(TargetGate)
             }));
+
+
         dstManager.SetComponentData(entity, new AgentSpeed { Value = speed });
-        
+        dstManager.SetComponentData(entity, new TargetGate { value = GateNums.A });
     }
 }
