@@ -8,7 +8,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 
 /// <summary> Our simple system. </summary>
-//[UpdateAfter(typeof(Unity.Physics.Systems.EndFramePhysicsSystem))]
+
 [UpdateAfter(typeof(AgentSystem_IJobChunk))]
 public class ApplyAgentMotion : SystemBase
 {
@@ -26,7 +26,7 @@ public class ApplyAgentMotion : SystemBase
             ref PhysicsMass _physicsMass,
             in ApplyImpulse _applyImpulseOnKeyData,
             in LocalToWorld ltw,
-            in AgentSpeed speed) =>
+            in AgentConfiguration ac) =>
         {
             
                 int rigidbodyIndex = physicsWorld.GetRigidBodyIndex(_entity);
@@ -34,10 +34,10 @@ public class ApplyAgentMotion : SystemBase
             /// Apply a linear impulse to the entity.
             
             PhysicsComponentExtensions.ApplyLinearImpulse(ref _physicsVelocity, _physicsMass, _applyImpulseOnKeyData.Direction * 0.5f);
-            if (math.length(_physicsVelocity.Linear) > speed.Value)
+            if (math.length(_physicsVelocity.Linear) > ac.Speed)
             {
                 float3 temp = _physicsVelocity.Linear;
-                temp = math.normalize(temp) * speed.Value;
+                temp = math.normalize(temp) * ac.Speed;
                 _physicsVelocity.Linear = temp;
             }
 

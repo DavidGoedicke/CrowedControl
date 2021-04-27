@@ -6,8 +6,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Systems;
 
-public struct GateNumber : IComponentData { public GateNums value; }
-public struct ActiveGate : IComponentData { }
+
 
 
 [DisallowMultipleComponent]

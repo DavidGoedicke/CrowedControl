@@ -5,58 +5,80 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Systems;
+using Unity.Physics.Authoring;
 
 
-public enum GateNums { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, NONE }
 
 public struct WasBornTag : IComponentData{ }
 public struct WalkingTag : IComponentData{ }
 public struct ArrivedTag : IComponentData{ }
-public struct AgentSpeed : IComponentData { public float Value; }
-public struct AgentPosition : IComponentData {  public float3 Value; }
-public struct AgentDirection : IComponentData { public float3 Value; }
+
+//public struct AgentPosition : IComponentData {  public float3 Value; }
+//public struct AgentDirection : IComponentData { public float3 Value; }
 public struct ApplyImpulse : IComponentData {  public float3 Direction;}
 
-public struct TargetGate : IComponentData { public GateNums value; }
-public struct HasFixedTarget : IComponentData { public Entity value; }
-
-
-
-[DisallowMultipleComponent]
-public class AgentAuthoring : MonoBehaviour, IConvertGameObjectToEntity
+public struct AgentConfiguration : IComponentData
 {
-    /// <summary>
-    /// We can refer directly to GameObject transforms in the authoring component
-    /// </summary>
-    public List<Transform> Waypoints;
+    public float Speed;
+    public GateNums TargetGate;
+    public float ViewingDistance;
+    public CollisionFilter ViewingFilter;
+}
 
+
+
+
+[RequireComponent(typeof(PhysicsShapeAuthoring))]
+[RequireComponent(typeof(PhysicsBodyAuthoring))]
+public class AgentAuthoring : MonoBehaviour
+{
+    [Header("Agent MaxSpeed")]
     // Fields are used to populate Entity data
     public float speed = 3.0f;
 
+    [Header("Agent Target Gate")]
     public GateNums SelectTargetGate = GateNums.A;
+
+    [Header("Viewing Distance")]
+    public float ViewingDistance = 300;
     
-    /// <summary>
-    /// A function which converts our Guard authoring GameObject to a more optimized Entity representation
-    /// </summary>
-    /// <param name="entity">A reference to the entity this GameObject will become</param>
-    /// <param name="dstManager">The EntityManager is used to make changes to Entity data.</param>
-    /// <param name="conversionSystem">Used for more advanced conversion features. Not used here.</param>
-    public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
+    public CollisionFilter ViewingFilter = new CollisionFilter {
+        BelongsTo = 1u<<3 ,
+        CollidesWith= 3u,
+        GroupIndex = 0
+    }; // TODO: This is by handAnd should be selected or automated
+    
+}
+
+
+
+[UpdateAfter(typeof(EndColliderConversionSystem))]
+[UpdateAfter(typeof(PhysicsBodyConversionSystem))]
+[DisallowMultipleComponent]
+public class AgentConversion : GameObjectConversionSystem
+{
+
+    protected override void OnUpdate()
     {
-        // Here we add all of the components needed to start the guard off in the "Patrol" state
-        // i.e. We add TargetPosition, and don't add IdleTimer or IsChasing tag
-        dstManager.AddComponents(entity, new ComponentTypes(
-            new ComponentType[] {
+        Entities.ForEach((AgentAuthoring m) =>
+        {
+            var entity = GetPrimaryEntity(m);
+
+            DstEntityManager.AddComponents(entity, new ComponentTypes(new ComponentType[] {
                 typeof(WasBornTag),
-                typeof(AgentSpeed),
-                typeof(AgentPosition),
-                typeof(AgentDirection),
-                typeof(ApplyImpulse),
-                typeof(TargetGate)
-            }));
+                typeof(ApplyImpulse)
+        }));
 
 
-        dstManager.SetComponentData(entity, new AgentSpeed { Value = speed });
-        dstManager.SetComponentData(entity, new TargetGate { value = GateNums.A });
+            DstEntityManager.AddComponentData(entity, new AgentConfiguration {
+                Speed = m.speed,
+                TargetGate = m.SelectTargetGate,
+                ViewingDistance = m.ViewingDistance,
+                ViewingFilter = m.ViewingFilter
+            }
+                );
+          
+
+        });
     }
 }

@@ -48,8 +48,9 @@ public partial class AgentSystem_IJobChunk : SystemBase
             .WithName("Initialize")
             .WithAny<WasBornTag>()
             .WithBurst(FloatMode.Default, FloatPrecision.Standard, true)
-            .ForEach((Entity entity, int entityInQueryIndex,ref AgentPosition pos, ref AgentDirection vel,ref PhysicsMass mass) =>
+            .ForEach((Entity entity, int entityInQueryIndex, ref PhysicsMass mass) =>
             {
+                /*
                 pos = new AgentPosition
                 {
                     Value = new float3(temp.NextFloat(-10, 10), 1, temp.NextFloat(-10, 10))
@@ -59,7 +60,9 @@ public partial class AgentSystem_IJobChunk : SystemBase
                     Value = temp.NextFloat3Direction()
                     
                 };
+
                 vel.Value.y = 0;
+                */
                 commandBuffer.RemoveComponent<WasBornTag>(entityInQueryIndex,entity);
                 commandBuffer.AddComponent<WalkingTag>(entityInQueryIndex, entity);
                 mass.InverseInertia[0] = 0;
@@ -77,7 +80,6 @@ public partial class AgentSystem_IJobChunk : SystemBase
        
         var positionMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
         var directionMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-        var SignMemory = new NativeArray<float3>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
         var initialPosArrayJobHandle = Entities
                     .WithAll<WalkingTag>()
                     .WithName("InitPosMemorySeparationJob")
@@ -89,18 +91,9 @@ public partial class AgentSystem_IJobChunk : SystemBase
                     })
                     .ScheduleParallel(Dependency);
 
-        var getGateDirection = Entities
-                    .WithAny<GateNumber,TargetGate>()
-                    .WithName("GetGateDirection")
-                    .ForEach((Entity entity, int entityInQueryIndex, in Physics pos) =>
-                    {
-
-                        SignMemory[entityInQueryIndex]
-
-
-                    })
-                    .ScheduleParallel(initialPosArrayJobHandle);
-
+        
+       
+                    
 
         float deltaTime = Time.DeltaTime;
         var steerJob = Entities
@@ -162,11 +155,11 @@ public partial class AgentSystem_IJobChunk : SystemBase
                
                
             })
-           .ScheduleParallel(getGateDirection);
+           .ScheduleParallel(initialPosArrayJobHandle); //getGateDirection
 
         positionMemory.Dispose(steerJob);
         directionMemory.Dispose(steerJob);
-        SignMemory.Dispose(steerJob);
+        
 
         Dependency = steerJob;
 
