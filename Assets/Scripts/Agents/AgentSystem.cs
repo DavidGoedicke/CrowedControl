@@ -96,7 +96,7 @@ public partial class AgentSystem_IJobChunk : SystemBase
                     
 
         float deltaTime = Time.DeltaTime;
-        var steerJob = Entities
+        var steerJob1 = Entities
             .WithName("Steer")
             .WithReadOnly(positionMemory)
             .WithReadOnly(directionMemory)
@@ -157,11 +157,26 @@ public partial class AgentSystem_IJobChunk : SystemBase
             })
            .ScheduleParallel(initialPosArrayJobHandle); //getGateDirection
 
-        positionMemory.Dispose(steerJob);
-        directionMemory.Dispose(steerJob);
-        
+        positionMemory.Dispose(steerJob1);
+        directionMemory.Dispose(steerJob1);
+        var steerJob2 = Entities
+           .WithName("SteerToGate")
+           .WithAll<WalkingTag,TargetGateEntity>()
+           .ForEach((ref ApplyImpulse impulse, in LocalToWorld IsPos,in TargetGatePosiition TargetPos) =>//in AgentInfo agent
+            {
+                float3 direction = TargetPos.value - IsPos.Position;
 
-        Dependency = steerJob;
+                float3 newDirection = (impulse.Direction * 0.5f) + (math.normalizesafe(direction) * 0.5f);
+
+                impulse = new ApplyImpulse
+                {
+                    Direction = newDirection
+                };
+
+            }).ScheduleParallel(steerJob1);
+
+        
+        Dependency = steerJob2;
 
 
     }

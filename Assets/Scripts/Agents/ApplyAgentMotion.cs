@@ -1,3 +1,4 @@
+#define DEBUG
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -41,11 +42,21 @@ public class ApplyAgentMotion : SystemBase
                 _physicsVelocity.Linear = temp;
             }
 
-             quaternion TargertOrientation = quaternion.LookRotationSafe(_applyImpulseOnKeyData.Direction, math.up());
-           quaternion angularchange = math.mul(TargertOrientation, math.inverse(quaternion.LookRotationSafe(ltw.Forward,math.up())));
+#if DEBUG
+            Debug.DrawRay(ltw.Position, _applyImpulseOnKeyData.Direction,Color.blue);
+#endif
+            
+            quaternion TargertOrientation = quaternion.LookRotationSafe(_applyImpulseOnKeyData.Direction, math.up());
+            quaternion angularchange = math.mul(TargertOrientation, math.inverse(quaternion.LookRotationSafe(ltw.Forward,math.up())));
+
+#if DEBUG
+            
+            Debug.DrawRay(ltw.Position+_applyImpulseOnKeyData.Direction, ltw.Right * angularchange.value.x, Color.red);
+#endif
             PhysicsComponentExtensions.ApplyAngularImpulse(ref _physicsVelocity, _physicsMass, new float3 (0,angularchange.value.y * 0.05f, 0));
 
         }).Run();
+
     }
 }
 

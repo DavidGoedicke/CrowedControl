@@ -32,7 +32,7 @@ public class AgentRayCast : SystemBase
         None = new ComponentType[]
           {
           },
-   
+
 
         Any = new ComponentType[]
           {
@@ -58,19 +58,20 @@ public class AgentRayCast : SystemBase
         var TargetCount = m_TargetQuery.CalculateEntityCount();
 
         if (TargetCount == 0) { return; }
-        Debug.Log("Target Count"  + TargetCount.ToString());
+
+        // Debug.Log("Target Count"  + TargetCount.ToString());
 
         var SignMemory2 = new NativeHashMap<int, GateNums>(TargetCount, Allocator.TempJob);
         Entities
             .WithoutBurst()
-                   .WithAny<ActiveGate,ActiveSign>()
+                   .WithAny<ActiveGate, ActiveSign>()
                    .WithName("AssociatingGateToNum")
-                   .ForEach((in Entity en ,in GateNumber gn) =>
+                   .ForEach((in Entity en, in GateNumber gn) =>
                    {
-                       
+
                        SignMemory2[en.GetHashCode()] = gn.value;
-                       
-                    })
+
+                   })
                    .Run();
 
 
@@ -90,8 +91,9 @@ public class AgentRayCast : SystemBase
                     float3 rayEnd = math.forward(localRotation.Value) * agentConfiguration.ViewingDistance
                     + rayStart;
 
+
+
 #if DEBUG
-                    
                     Debug.DrawRay(rayStart, rayEnd - rayStart);
 #endif
 
@@ -106,24 +108,39 @@ public class AgentRayCast : SystemBase
 
                     var hit = world.CastRay(raycastInput, out var rayResult);
 
-                    if (hit && SignMemory2[rayResult.Entity.GetHashCode()] == agentConfiguration.TargetGate)
+                    if (hit)
                     {
 
-                       Debug.DrawRay(rayStart + (math.forward(localRotation.Value) * agentConfiguration.ViewingDistance) * rayResult.Fraction, Vector3.up, Color.red,5f);
+                        if (SignMemory2.ContainsKey(rayResult.Entity.GetHashCode()))
+                        {
+#if DEBUG
+                            Debug.DrawRay(rayResult.Position, Vector3.up, Color.green, 5f);
+#endif
+                            if (SignMemory2[rayResult.Entity.GetHashCode()] == agentConfiguration.TargetGate)
+                            {
+                                ecb.AddComponent(entity, new TargetGateEntity { value = rayResult.Entity });
+                                ecb.AddComponent(entity, new TargetGatePosiition { value = rayResult.Position });
 
-                       // Debug.Log(rayResult.Entity.Index+"  "+ entity.Index );
-                       // ecb.DestroyEntity(entity);
-                        ecb.AddComponent(entity, new TargetGateEntity { value = rayResult.Entity });
-                      
+
+                            }
+                        }
+                        else
+                        {
+#if DEBUG
+                            Debug.DrawRay(rayStart + (math.forward(localRotation.Value) * agentConfiguration.ViewingDistance) * rayResult.Fraction, Vector3.up, Color.red, 5f);
+#endif
+                        }
+
+
+
                     }
 
 
                 }).Run();
 
-        combineJo
         SignMemory2.Dispose(this.Dependency);
         m_EndSimulationEcbSystem.AddJobHandleForProducer(this.Dependency);
-       
+
     }
 
 }

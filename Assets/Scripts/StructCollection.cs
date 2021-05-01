@@ -1,6 +1,6 @@
 //Gate and sign strucut managment.
-
 using Unity.Entities;
+using Unity.Mathematics;
 
 
 //General:
@@ -17,6 +17,7 @@ public enum GateNums { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, 
 //What the agent wants to go to;
 
 public struct TargetGateEntity : IComponentData { public Entity value; }
+public struct TargetGatePosiition : IComponentData { public float3 value; }
 
 //Gate:
 // Details a Gate or
