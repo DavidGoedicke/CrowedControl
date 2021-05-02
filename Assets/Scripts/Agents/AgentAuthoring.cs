@@ -43,7 +43,7 @@ public class AgentAuthoring : MonoBehaviour
     public float ViewingDistance = 300;
     
     public CollisionFilter ViewingFilter = new CollisionFilter {
-        BelongsTo = 1u<<3 ,
+        BelongsTo = 1u<<2 ,
         CollidesWith= 3u,
         GroupIndex = 0
     }; // TODO: This is by handAnd should be selected or automated
@@ -77,8 +77,6 @@ public class AgentConversion : GameObjectConversionSystem
                 ViewingFilter = m.ViewingFilter
             }
                 );
-          
-
         });
     }
 }

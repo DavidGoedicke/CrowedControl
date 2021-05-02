@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUGMOTION
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -13,6 +13,10 @@ using Unity.Transforms;
 [UpdateAfter(typeof(AgentSystem_IJobChunk))]
 public class ApplyAgentMotion : SystemBase
 {
+    float mapFloat(float val, float in_min, float in_max, float out_min, float out_max) //https://gist.github.com/nadavmatalon/71ccaf154bc4bd71f811289e78c65918
+    {
+        return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+    }
 
     protected override void OnUpdate()
     {
@@ -29,11 +33,12 @@ public class ApplyAgentMotion : SystemBase
             in LocalToWorld ltw,
             in AgentConfiguration ac) =>
         {
-            
-                int rigidbodyIndex = physicsWorld.GetRigidBodyIndex(_entity);
+
+
+            int rigidbodyIndex = physicsWorld.GetRigidBodyIndex(_entity);
 
             /// Apply a linear impulse to the entity.
-            
+
             PhysicsComponentExtensions.ApplyLinearImpulse(ref _physicsVelocity, _physicsMass, _applyImpulseOnKeyData.Direction * 0.5f);
             if (math.length(_physicsVelocity.Linear) > ac.Speed)
             {
@@ -42,18 +47,36 @@ public class ApplyAgentMotion : SystemBase
                 _physicsVelocity.Linear = temp;
             }
 
-#if DEBUG
-            Debug.DrawRay(ltw.Position, _applyImpulseOnKeyData.Direction,Color.blue);
-#endif
-            
-            quaternion TargertOrientation = quaternion.LookRotationSafe(_applyImpulseOnKeyData.Direction, math.up());
-            quaternion angularchange = math.mul(TargertOrientation, math.inverse(quaternion.LookRotationSafe(ltw.Forward,math.up())));
+            float2 A = math.normalize(new float2(ltw.Forward.x, ltw.Forward.z));
+            float2 B = math.normalize(new float2(_applyImpulseOnKeyData.Direction.x, _applyImpulseOnKeyData.Direction.z));
+          
 
-#if DEBUG
-            
-            Debug.DrawRay(ltw.Position+_applyImpulseOnKeyData.Direction, ltw.Right * angularchange.value.x, Color.red);
+            float dotProduct = math.dot(A, B);
+            float angleDiff = math.acos(dotProduct);
+            angleDiff = (math.cross(ltw.Forward, _applyImpulseOnKeyData.Direction)).y < 0 ? -angleDiff : angleDiff;
+#if DEBUGMOTION
+            //Debug.Log(math.degrees(angleDiff) + "<=Angle : lanrg =>"+"  DotProduct =>"+A.ToString()+B.ToString()+ _applyImpulseOnKeyData.Direction.x.ToString());
+            Debug.DrawRay(ltw.Position , new Vector3(A.x,0,A.y) , Color.green);
+            Debug.DrawRay(ltw.Position, _applyImpulseOnKeyData.Direction, Color.blue);
+            Debug.DrawRay(ltw.Position, new Vector3(B.x, 0, B.y), Color.red);
+            Debug.DrawRay(ltw.Position, math.cross(ltw.Forward, _applyImpulseOnKeyData.Direction), Color.white);
+                Debug.DrawRay(new Vector3(ltw.Position.x, ltw.Position.y, ltw.Position.z)
+                    + new Vector3(
+                           _applyImpulseOnKeyData.Direction.x, _applyImpulseOnKeyData.Direction.y, _applyImpulseOnKeyData.Direction.z),
+                   angleDiff * Vector3.Cross(
+                       new Vector3(
+                           _applyImpulseOnKeyData.Direction.x, _applyImpulseOnKeyData.Direction.y, _applyImpulseOnKeyData.Direction.z)
+                           , Vector3.up).normalized, Color.cyan);
+            //Debug.Log(math.degrees(angleDiff));
 #endif
-            PhysicsComponentExtensions.ApplyAngularImpulse(ref _physicsVelocity, _physicsMass, new float3 (0,angularchange.value.y * 0.05f, 0));
+
+            if (angleDiff >=-math.PI && angleDiff <= math.PI)
+            {
+                 float multiplyer = 0.15f;
+                float rotationSpeed = math.length(_physicsVelocity.Angular);
+                
+                 PhysicsComponentExtensions.ApplyAngularImpulse(ref _physicsVelocity, _physicsMass, new float3(0, angleDiff* math.clamp(mapFloat(rotationSpeed,0f,1f, multiplyer, 0f),multiplyer,0f), 0));
+            }
 
         }).Run();
 

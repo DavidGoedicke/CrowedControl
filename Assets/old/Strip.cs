@@ -3,7 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 
 public class Strip : MonoBehaviour {
-		int maximumLineLength = 50;
+    /*
+    int maximumLineLength = 50;
 		List <Vector3> points;
 		Color myColor;
 		LineRenderer myLineRenderer;
@@ -65,7 +66,7 @@ public class Strip : MonoBehaviour {
 			return Vector3.zero;
 
 		}
-*/
+
 
 	}
 	public void init (Color newCol, Vector3 firstPoint)
@@ -107,5 +108,5 @@ public class Strip : MonoBehaviour {
 		public void delete ()
 		{
 
-		}
+		}*/
 	}

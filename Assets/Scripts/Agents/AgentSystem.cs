@@ -103,14 +103,14 @@ public partial class AgentSystem_IJobChunk : SystemBase
             .WithAll<WalkingTag>()
             .ForEach((ref ApplyImpulse impulse, in LocalToWorld pos) =>//in AgentInfo agent
             {
-                float minRaduis = 1.5f;
-                float aviodWeight = 0.9f;
+                float minRaduis = 2f;
+                float aviodWeight = 0.75f;
 
-                float maxAlignRadius = 25f;
-                float alignWeight = 0.8f;
+                float maxAlignRadius = 15f;
+                float alignWeight = 0.5f;
 
                 float maxGroupingRadius = 100.0f;
-                float groupingWeight = 0.2f;
+                float groupingWeight = 0.1f;
 
                 uint avoidCount = 0;
                 float3 avoidVector = float3.zero;
@@ -165,12 +165,21 @@ public partial class AgentSystem_IJobChunk : SystemBase
            .ForEach((ref ApplyImpulse impulse, in LocalToWorld IsPos,in TargetGatePosiition TargetPos) =>//in AgentInfo agent
             {
                 float3 direction = TargetPos.value - IsPos.Position;
+                float3 newDirection;
+                if (math.length(impulse.Direction) > 0.01f)
+                {
+                     newDirection = (impulse.Direction * 0.3f) + (math.normalizesafe(direction) * 0.7f);
+                }
+                else
+                {
+                    newDirection =  direction;
 
-                float3 newDirection = (impulse.Direction * 0.5f) + (math.normalizesafe(direction) * 0.5f);
+
+                }
 
                 impulse = new ApplyImpulse
                 {
-                    Direction = newDirection
+                    Direction = math.normalizesafe(newDirection)
                 };
 
             }).ScheduleParallel(steerJob1);
