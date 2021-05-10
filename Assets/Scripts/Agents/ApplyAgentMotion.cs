@@ -39,7 +39,7 @@ public class ApplyAgentMotion : SystemBase
 
             /// Apply a linear impulse to the entity.
 
-            PhysicsComponentExtensions.ApplyLinearImpulse(ref _physicsVelocity, _physicsMass, _applyImpulseOnKeyData.Direction * 0.5f);
+             PhysicsComponentExtensions.ApplyLinearImpulse(ref _physicsVelocity, _physicsMass, _applyImpulseOnKeyData.Direction * 0.5f);
             if (math.length(_physicsVelocity.Linear) > ac.Speed)
             {
                 float3 temp = _physicsVelocity.Linear;
@@ -57,25 +57,16 @@ public class ApplyAgentMotion : SystemBase
 #if DEBUGMOTION
             //Debug.Log(math.degrees(angleDiff) + "<=Angle : lanrg =>"+"  DotProduct =>"+A.ToString()+B.ToString()+ _applyImpulseOnKeyData.Direction.x.ToString());
             Debug.DrawRay(ltw.Position , new Vector3(A.x,0,A.y) , Color.green);
-            Debug.DrawRay(ltw.Position, _applyImpulseOnKeyData.Direction, Color.blue);
-            Debug.DrawRay(ltw.Position, new Vector3(B.x, 0, B.y), Color.red);
-            Debug.DrawRay(ltw.Position, math.cross(ltw.Forward, _applyImpulseOnKeyData.Direction), Color.white);
-                Debug.DrawRay(new Vector3(ltw.Position.x, ltw.Position.y, ltw.Position.z)
-                    + new Vector3(
-                           _applyImpulseOnKeyData.Direction.x, _applyImpulseOnKeyData.Direction.y, _applyImpulseOnKeyData.Direction.z),
-                   angleDiff * Vector3.Cross(
-                       new Vector3(
-                           _applyImpulseOnKeyData.Direction.x, _applyImpulseOnKeyData.Direction.y, _applyImpulseOnKeyData.Direction.z)
-                           , Vector3.up).normalized, Color.cyan);
+            Debug.DrawRay(ltw.Position, new Vector3(B.x,0, B.y), Color.red);
+            Debug.DrawRay(ltw.Position, ltw.Right *angleDiff*10, Color.cyan);
             //Debug.Log(math.degrees(angleDiff));
 #endif
 
             if (angleDiff >=-math.PI && angleDiff <= math.PI)
             {
-                 float multiplyer = 0.15f;
+                float multiplyer = 0.025f;
                 float rotationSpeed = math.length(_physicsVelocity.Angular);
-                
-                 PhysicsComponentExtensions.ApplyAngularImpulse(ref _physicsVelocity, _physicsMass, new float3(0, angleDiff* math.clamp(mapFloat(rotationSpeed,0f,1f, multiplyer, 0f),multiplyer,0f), 0));
+            PhysicsComponentExtensions.ApplyAngularImpulse(ref _physicsVelocity, _physicsMass, new float3(0, angleDiff* math.clamp(rotationSpeed.MapRange(0f,1f, multiplyer, 0f),multiplyer,0f), 0));
             }
 
         }).Run();

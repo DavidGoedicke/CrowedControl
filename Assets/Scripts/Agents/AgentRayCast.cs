@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUGRAY
 
 using UnityEngine;
 using Unity.Entities;
@@ -93,7 +93,7 @@ public class AgentRayCast : SystemBase
 
 
 
-#if DEBUG
+#if DEBUGRAY
                     Debug.DrawRay(rayStart, rayEnd - rayStart);
 #endif
 
@@ -113,7 +113,7 @@ public class AgentRayCast : SystemBase
 
                         if (SignMemory2.ContainsKey(rayResult.Entity.GetHashCode()))
                         {
-#if DEBUG
+#if DEBUGRAY
                             Debug.DrawRay(rayResult.Position, Vector3.up, Color.green, 5f);
 #endif
                             if (SignMemory2[rayResult.Entity.GetHashCode()] == agentConfiguration.TargetGate)
@@ -126,7 +126,7 @@ public class AgentRayCast : SystemBase
                         }
                         else
                         {
-#if DEBUG
+#if DEBUGRAY
                             Debug.DrawRay(rayStart + (math.forward(localRotation.Value) * agentConfiguration.ViewingDistance) * rayResult.Fraction, Vector3.up, Color.red, 5f);
 #endif
                         }

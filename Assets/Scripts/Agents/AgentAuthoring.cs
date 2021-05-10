@@ -23,6 +23,8 @@ public struct AgentConfiguration : IComponentData
     public GateNums TargetGate;
     public float ViewingDistance;
     public CollisionFilter ViewingFilter;
+
+    
 }
 
 
@@ -47,7 +49,11 @@ public class AgentAuthoring : MonoBehaviour
         CollidesWith= 3u,
         GroupIndex = 0
     }; // TODO: This is by handAnd should be selected or automated
-    
+
+    public bool LockX;
+    public bool LockY;
+    public bool LockZ;
+
 }
 
 
@@ -65,11 +71,20 @@ public class AgentConversion : GameObjectConversionSystem
             var entity = GetPrimaryEntity(m);
 
             DstEntityManager.AddComponents(entity, new ComponentTypes(new ComponentType[] {
-                typeof(WasBornTag),
-                typeof(ApplyImpulse)
+                typeof(WasBornTag)  
         }));
 
+            /*
 
+            if (DstEntityManager.HasComponent<PhysicsMass>(entity))
+            {
+                var mass = DstEntityManager.GetComponentData<PhysicsMass>(entity);
+                mass.InverseInertia[0] = m.LockX ? 0 : mass.InverseInertia[0];
+                mass.InverseInertia[1] = m.LockY ? 0 : mass.InverseInertia[1];
+                mass.InverseInertia[2] = m.LockZ ? 0 : mass.InverseInertia[2];
+                Debug.Log("Fixed the mass");
+            }
+            */
             DstEntityManager.AddComponentData(entity, new AgentConfiguration {
                 Speed = m.speed,
                 TargetGate = m.SelectTargetGate,
