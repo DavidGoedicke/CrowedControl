@@ -1,5 +1,6 @@
 // #define DEBUGDIRECT
 //	#define DEBUGDIRTEXT
+#define DEBUGWALL
 
 using System.Collections.Generic;
 using Unity.Collections;
@@ -18,12 +19,24 @@ using Unity.Physics.Systems;
 public partial class AgentSystem_IJobChunk: SystemBase
 {
 
-
+	FloorVectorManager floorVectorManager;
 	BeginInitializationEntityCommandBufferSystem m_EntityCommandBufferSystem;
+
+
+
 	protected override void OnCreate() {
 
 
+
+
+		floorVectorManager.Init(
+			World.GetOrCreateSystem<BuildPhysicsWorld>(),
+			World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>()
+			);
+
 		m_EntityCommandBufferSystem = World.GetOrCreateSystem<BeginInitializationEntityCommandBufferSystem>();
+
+
 
 	}
 
@@ -48,11 +61,11 @@ public partial class AgentSystem_IJobChunk: SystemBase
 			.WithName("Initialize")
 			.WithAny<WasBornTag>()
 			.WithBurst(FloatMode.Default, FloatPrecision.Standard, true)
-			.ForEach((Entity entity, int entityInQueryIndex, ref PhysicsMass mass) => {
+			.ForEach((Entity entity, int entityInQueryIndex, ref PhysicsMass mass, in LocalToWorld pos) => {
 
 				commandBuffer.RemoveComponent<WasBornTag>(entityInQueryIndex, entity);
 				commandBuffer.AddComponent<WalkingTag>(entityInQueryIndex, entity);
-				commandBuffer.AddComponent<ApplyImpulse>(entityInQueryIndex, entity);
+				commandBuffer.AddComponent<ApplyImpulse>(entityInQueryIndex, entity,new ApplyImpulse { Direction = pos.Forward });
 				mass.InverseInertia[0] = 0;
 				//mass.InverseInertia[1] = 0;
 				mass.InverseInertia[2] = 0;
@@ -67,6 +80,21 @@ public partial class AgentSystem_IJobChunk: SystemBase
 
 		if (agentCount == 0) { return; }
 
+		var wallDirection = new NativeArray<float2>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+		
+		Entities
+			.WithoutBurst()
+					.WithAll<WalkingTag>()
+					.WithName("WallAsignandCalc")
+					.ForEach((int entityInQueryIndex, in LocalToWorld pos) => {
+
+						wallDirection[entityInQueryIndex] = floorVectorManager.WallVector(new float2(pos.Position.x, pos.Position.z));
+						
+					})
+					.Run();
+
+
+
 		var positionMemory = new NativeArray<float2>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 		var directionMemory = new NativeArray<float2>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 		var initialPosArrayJobHandle = Entities
@@ -79,9 +107,7 @@ public partial class AgentSystem_IJobChunk: SystemBase
 					})
 					.ScheduleParallel(Dependency);
 
-
-
-
+		
 
 		float deltaTime = Time.DeltaTime;
 		var steerJob1 = Entities
@@ -89,7 +115,7 @@ public partial class AgentSystem_IJobChunk: SystemBase
 			.WithReadOnly(positionMemory)
 			.WithReadOnly(directionMemory)
 			.WithAll<WalkingTag>()
-			.ForEach((ref ApplyImpulse impulse, in LocalToWorld pos) =>//in AgentInfo agent
+			.ForEach((ref ApplyImpulse impulse, in LocalToWorld pos,in int entityInQueryIndex) =>//in AgentInfo agent
 			{
 				//float avoidStrong = 1.5f;
 				float minRaduis = 3f;
@@ -146,7 +172,7 @@ public partial class AgentSystem_IJobChunk: SystemBase
 							avoidVector += ((pos.Position.xz - positionMemory[i])* avoidAdjust);
 							
 						} else {
-							avoidVector += ((pos.Position.xz - positionMemory[i])*0.5f);//if we go into the opposite direction it doesnt matter as much when they come close
+							avoidVector += ((pos.Position.xz - positionMemory[i]));//if we go into the opposite direction it doesnt matter as much when they come close
 						}
 						avoidCount++;
 					}
@@ -167,9 +193,9 @@ public partial class AgentSystem_IJobChunk: SystemBase
 				groupingCenter /= groupingCount;
 				alignDirection /= alignCount;
 				avoidVector /= avoidCount;
-
+#if DEBUGDIRTEXT
 				Debug.Log(groupingCount.ToString() + " " + alignCount.ToString() + " " + avoidCount.ToString());
-
+#endif
 				float2 newValue = math.normalizesafe(
 					(math.normalizesafe(avoidVector) * aviodWeight +
 					math.normalizesafe(alignDirection) * alignWeight +
@@ -190,9 +216,22 @@ public partial class AgentSystem_IJobChunk: SystemBase
 				Debug.DrawRay(pos.Position, newValue.ExtendTo3() * 10 * aviodWeight, Color.white);
 				
 #endif
-				impulse = new ApplyImpulse {
-					Direction = newValue.ExtendTo3()
-				};
+
+#if DEBUGWALL
+				Debug.DrawRay(pos.Position, newValue.ExtendTo3(), Color.green);
+				Debug.DrawRay(pos.Position, wallDirection[entityInQueryIndex].ExtendTo3(), Color.white);
+				Debug.DrawRay(pos.Position, (newValue * 0.5f + wallDirection[entityInQueryIndex] * 0.5f).ExtendTo3(), Color.red);
+
+#endif
+				if (math.length(wallDirection[entityInQueryIndex]) > 0) {
+					impulse = new ApplyImpulse {
+						Direction = (newValue * 0.3f + wallDirection[entityInQueryIndex] * 0.7f).ExtendTo3()
+					};
+				} else {
+					impulse = new ApplyImpulse {
+						Direction = newValue.ExtendTo3()
+					};
+				}
 
 
 			})
@@ -200,6 +239,7 @@ public partial class AgentSystem_IJobChunk: SystemBase
 
 		positionMemory.Dispose(steerJob1);
 		directionMemory.Dispose(steerJob1);
+		wallDirection.Dispose(steerJob1); 
 		var steerJob2 = Entities
 		   .WithName("SteerToGate")
 		   .WithAll<WalkingTag, TargetGateEntity>()
@@ -208,6 +248,7 @@ public partial class AgentSystem_IJobChunk: SystemBase
 			   float3 direction = TargetPos.value - IsPos.Position;
 			   float3 newDirection;
 			   if (math.length(impulse.Direction) > 0.01f) {
+
 				   newDirection = (impulse.Direction * 0.3f) + (math.normalizesafe(direction) * 0.7f);
 			   } else {
 				   newDirection = direction;
@@ -221,7 +262,7 @@ public partial class AgentSystem_IJobChunk: SystemBase
 
 		   }).ScheduleParallel(steerJob1);
 
-
+		
 		Dependency = steerJob2;
 
 
@@ -241,17 +282,5 @@ public partial class AgentSystem_IJobChunk: SystemBase
 	}
 }
 
-	public static class Util
-	{
-		public static float3 ExtendTo3(this float2 x) {
-			return new float3(x.x, 0, x.y);
-		}
-		public static float3 ExtendTo3(this float2 x, float y) {
-			return new float3(x.x, y, x.y);
-		}	
-		public static float MapRange(this float val, float in_min, float in_max, float out_min, float out_max) //https://gist.github.com/nadavmatalon/71ccaf154bc4bd71f811289e78c65918
-	   {
-			return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-		}
-	}
+	
 

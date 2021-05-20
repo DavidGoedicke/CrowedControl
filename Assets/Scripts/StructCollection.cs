@@ -42,3 +42,27 @@ public struct ActiveGate : IComponentData { }
 //Gate:
 // Details a Sign 
 public struct ActiveSign : IComponentData { }
+
+
+public static class Util
+{
+	public static float3 ExtendTo3(this float2 x) {
+		return new float3(x.x, 0, x.y);
+	}
+	public static float3 ExtendTo3(this float2 x, float y) {
+		return new float3(x.x, y, x.y);
+	}
+	public static float MapRange(this float val, float in_min, float in_max, float out_min, float out_max) //https://gist.github.com/nadavmatalon/71ccaf154bc4bd71f811289e78c65918
+   {
+		return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+	}
+}
+
+
+public static class GameVals
+{
+
+	public static readonly int WallHeight = 3;
+	public static readonly int WallSuperSampling =2;
+	public static readonly float WallViewSize = 1.5f;
+}
