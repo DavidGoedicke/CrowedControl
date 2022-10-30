@@ -7,13 +7,12 @@ using UnityEngine;
 
 //General:
 
-// This is used as a querey filter to identefy anything a agent might look at (sign or gate, etc) :
+// This is used as a query filter to identefy anything a agent might look at (sign or gate, etc) :
 // public struct VisibleFollowPoint : IComponentData {}
 // Similarly the Gate associate with that.
-public struct GateNumber : IComponentData { public GateNums value; }
-public struct SignNumber : IComponentData { public GateNums value; } /// <summary>
-///  We allow multiple of this component.       
-/// </summary>
+//public struct GateNumber : IComponentData {}
+
+
 public enum GateNums { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z, NONE }
 
 public struct GateColor
@@ -31,17 +30,20 @@ public struct GateColor
 //Agent:
 //What the agent wants to go to;
 
-public struct TargetGateEntity : IComponentData { public Entity value; }
-public struct TargetGatePosiition : IComponentData { public float3 value; }
+public struct TargetGateEntity : IComponentData
+{
+	public Entity value;
+	public float3 pos;
+}
 public struct ColorRecieved : IComponentData { }
 
 //Gate:
 // Details a Gate or
-public struct ActiveGate : IComponentData { }
+public struct ActiveGate : IComponentData { public GateNums value;  }
 
 //Gate:
 // Details a Sign 
-public struct ActiveSign : IComponentData { }
+public struct ActiveSign : IComponentData { public GateNums value;  }
 
 
 public static class Util

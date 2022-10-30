@@ -22,7 +22,7 @@ public class FloorAuthoring: MonoBehaviour, IConvertGameObjectToEntity
 	public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
 		// Here we add all of the components needed to start the guard off in the "Patrol" state
 		// i.e. We add TargetPosition, and don't add IdleTimer or IsChasing tag
-		dstManager.AddComponents(entity, new ComponentTypes(
+		dstManager.AddComponents(entity, new ComponentTypeSet(
 			new ComponentType[] {
 				typeof(IsFloorTag)
 			}));

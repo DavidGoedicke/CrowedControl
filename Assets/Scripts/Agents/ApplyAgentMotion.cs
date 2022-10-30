@@ -10,8 +10,8 @@ using Unity.Transforms;
 
 /// <summary> Our simple system. </summary>
 
-[UpdateAfter(typeof(AgentSystem_IJobChunk))]
-public class ApplyAgentMotion : SystemBase
+[UpdateAfter(typeof(AgentSystem))]
+public partial class ApplyAgentMotion : SystemBase
 {
     
 

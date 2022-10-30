@@ -9,41 +9,88 @@ using Unity.Physics.Systems;
 using UnityEngine;
 
 
-[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateAfter(typeof(EndFramePhysicsSystem))]
-public class GateCollisionHandle : SystemBase
+[UpdateInGroup(typeof(PhysicsSystemGroup))]
+[UpdateAfter(typeof(PhysicsSimulationGroup))]
+[UpdateBefore(typeof(ExportPhysicsWorld))]
+[BurstCompile]
+public partial struct GateCollisionHandle : ISystem
 {
+    
+    ComponentDataHandles m_Handles;
 
-
-    private BuildPhysicsWorld m_BuildPhysicsWorld;
-    private StepPhysicsWorld m_StepPhysicsWorld;
-    private EntityQuery m_ActiveGates;
-    private EndSimulationEntityCommandBufferSystem m_CmdBuffer;
-
-
-    protected override void OnCreate()
+    struct ComponentDataHandles
     {
-        m_BuildPhysicsWorld = World.GetOrCreateSystem<BuildPhysicsWorld>();
-        m_StepPhysicsWorld = World.GetOrCreateSystem<StepPhysicsWorld>();
-        m_CmdBuffer = World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>();
-        m_ActiveGates = GetEntityQuery(new EntityQueryDesc
+        
+        public ComponentLookup<ActiveGate> ActiveGatesGroup;
+        public ComponentLookup<WalkingTag> WalkingTagGroup;
+        public ComponentLookup<AgentConfiguration> AgentConfigurationGroup;
+        
+      
+
+        public ComponentDataHandles(ref SystemState state)
         {
-            All = new ComponentType[]
+            ActiveGatesGroup = state.GetComponentLookup<ActiveGate>(true);
+            WalkingTagGroup = state.GetComponentLookup<WalkingTag>(true);
+            AgentConfigurationGroup = state.GetComponentLookup<AgentConfiguration>(true);
+        }
+
+        public void Update(ref SystemState state)
+        {
+            ActiveGatesGroup.Update(ref state);
+            WalkingTagGroup.Update(ref state);
+            AgentConfigurationGroup.Update(ref state);
+        }
+    }
+    
+    
+
+    private EntityQuery m_ActiveGates;
+   
+    [BurstCompile]
+    public  void OnCreate(ref SystemState state)
+    {
+        m_Handles = new ComponentDataHandles(ref state);
+        m_ActiveGates = state.GetEntityQuery(new EntityQueryDesc
+        {
+            Any = new ComponentType[]
           {
-                typeof(ActiveGate)
+                typeof(ActiveGate),
+                typeof(WalkingTag)
           }
         });
     }
-#if DEBUGTRIGGER
+
+    public void OnDestroy(ref SystemState state)
+    {
+       
+    }
     [BurstCompile]
-#endif
+    public void OnUpdate(ref SystemState state)
+    {
+      
+        m_Handles.Update(ref state);
+        var ecbSingleton =
+            SystemAPI.GetSingleton<
+                BeginSimulationEntityCommandBufferSystem.Singleton>();
+        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+        state.Dependency = new TriggerGateJob
+        {
+            ActiveGatesGroup = state.GetComponentLookup<ActiveGate>(true),
+            WalkingTagGroup =  state.GetComponentLookup<WalkingTag>(),
+            AgentConfigurationGroup = state.GetComponentLookup<AgentConfiguration>(),
+            m_CmdBuffer = ecb
+        }.Schedule(SystemAPI.GetSingleton<SimulationSingleton>(), state.Dependency);
+        
+    }
+
+    [BurstCompile]
     struct TriggerGateJob : ITriggerEventsJob
     {
-        [ReadOnly] public ComponentDataFromEntity<ActiveGate> ActiveGatesGroup;
-        public ComponentDataFromEntity<WalkingTag> WalkingTagGroup;
-        public ComponentDataFromEntity<GateNumber> GateNumberGroup;
-        public ComponentDataFromEntity<AgentConfiguration> AgentConfigurationGroup;
-        public EntityCommandBuffer m_CmdBuffer;
+        
+        [ReadOnly] public ComponentLookup<ActiveGate> ActiveGatesGroup;
+        public ComponentLookup<WalkingTag> WalkingTagGroup;
+        public ComponentLookup<AgentConfiguration> AgentConfigurationGroup;
+        public  EntityCommandBuffer m_CmdBuffer;
 
         public void Execute(TriggerEvent triggerEvent)
         {
@@ -67,12 +114,10 @@ public class GateCollisionHandle : SystemBase
             
             var AgentEntity = isBodyATrigger ? entityB : entityA;
             var GateEntity = isBodyATrigger ? entityA : entityB;
-#if DEBUGTRIGGER
-            Debug.Log("Trtying to delet a thing");
-#endif
-            if (GateNumberGroup.HasComponent(GateEntity))
+
+            if (ActiveGatesGroup.HasComponent(GateEntity))
             {
-                GateNumber GNcomp = GateNumberGroup[GateEntity];
+                ActiveGate GNcomp = ActiveGatesGroup[GateEntity];
                 AgentConfiguration ACcomp = AgentConfigurationGroup[AgentEntity];
                
                 if (GNcomp.value==ACcomp.TargetGate) { 
@@ -85,25 +130,6 @@ public class GateCollisionHandle : SystemBase
 
         }
     }
-
-    protected override void OnUpdate()
-    {
-        if (m_ActiveGates.CalculateEntityCount() == 0)
-        {
-            return;
-        }
-        var ecb = m_CmdBuffer.CreateCommandBuffer();
-        Dependency = new TriggerGateJob
-        {
-            ActiveGatesGroup = GetComponentDataFromEntity<ActiveGate>(true),
-            WalkingTagGroup = GetComponentDataFromEntity<WalkingTag>(),
-            GateNumberGroup = GetComponentDataFromEntity<GateNumber>(),
-            AgentConfigurationGroup = GetComponentDataFromEntity<AgentConfiguration>(),
-            m_CmdBuffer = ecb,
-        }.Schedule(m_StepPhysicsWorld.Simulation,
-            ref m_BuildPhysicsWorld.PhysicsWorld, Dependency);
-        Dependency.Complete();
-        m_CmdBuffer.AddJobHandleForProducer(this.Dependency);
-    }
+  
 
 }

@@ -24,14 +24,14 @@ public class SignAuthoring : MonoBehaviour, IConvertGameObjectToEntity
         //    }));
         if (StartActive)
         {
-            dstManager.AddComponents(entity, new ComponentTypes(
+            dstManager.AddComponents(entity, new ComponentTypeSet(
            new ComponentType[] {
                 typeof(ActiveSign)
            }));
         }
         foreach (GateNums temp in PublicSignNumber)
         {
-            dstManager.AddComponentData(entity, new SignNumber { value = temp });
+            dstManager.AddComponentData(entity, new ActiveSign() { value = temp });
         }
 
     }

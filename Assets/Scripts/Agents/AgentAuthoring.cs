@@ -28,8 +28,6 @@ public struct AgentConfiguration : IComponentData
 }
 
 
-
-
 [RequireComponent(typeof(PhysicsShapeAuthoring))]
 [RequireComponent(typeof(PhysicsBodyAuthoring))]
 public class AgentAuthoring : MonoBehaviour
@@ -58,40 +56,20 @@ public class AgentAuthoring : MonoBehaviour
 
 
 
-[UpdateAfter(typeof(EndColliderConversionSystem))]
-[UpdateAfter(typeof(PhysicsBodyConversionSystem))]
+
 [DisallowMultipleComponent]
-public class AgentConversion : GameObjectConversionSystem
+public class AgentConversion : Baker<AgentAuthoring>
 {
 
-    protected override void OnUpdate()
+    public override void Bake(AgentAuthoring m)
     {
-        Entities.ForEach((AgentAuthoring m) =>
-        {
-            var entity = GetPrimaryEntity(m);
-
-            DstEntityManager.AddComponents(entity, new ComponentTypes(new ComponentType[] {
-                typeof(WasBornTag)  
-        }));
-
-            /*
-
-            if (DstEntityManager.HasComponent<PhysicsMass>(entity))
-            {
-                var mass = DstEntityManager.GetComponentData<PhysicsMass>(entity);
-                mass.InverseInertia[0] = m.LockX ? 0 : mass.InverseInertia[0];
-                mass.InverseInertia[1] = m.LockY ? 0 : mass.InverseInertia[1];
-                mass.InverseInertia[2] = m.LockZ ? 0 : mass.InverseInertia[2];
-                Debug.Log("Fixed the mass");
-            }
-            */
-            DstEntityManager.AddComponentData(entity, new AgentConfiguration {
+        // This simple baker adds just one component to the entity.
+        AddComponent( new AgentConfiguration {
                 Speed = m.speed,
                 TargetGate = m.SelectTargetGate,
                 ViewingDistance = m.ViewingDistance,
                 ViewingFilter = m.ViewingFilter
-            }
-                );
-        });
+            });
     }
 }
+    
