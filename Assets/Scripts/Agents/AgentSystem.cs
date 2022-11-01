@@ -18,6 +18,24 @@ using Unity.Physics.Systems;
 [BurstCompile]
 public partial struct AgentSystem : ISystem
 {
+    public struct BoidJobResults
+    {
+        public float3 avoid;
+        public float3 algin;
+        public float3 group;
+    }
+
+    public struct GateJobResults
+    {
+        public float3 Direction;
+    }
+
+    public struct WalljobResult
+    {
+        public float3 Avoid;
+        public float Timmer;
+    }
+
     struct ComponentDataHandles
     {
         public ComponentLookup<WalkingTag> c_walkingTagGroup;
@@ -47,6 +65,10 @@ public partial struct AgentSystem : ISystem
 
     private EntityQuery m_WalkingAgents;
     ComponentDataHandles m_Handles;
+    const float aviodWeight = 0.16f;
+    const float alignWeight = 0.1f;
+    const float groupingWeight = 0.15f;
+    const float gateWeight = 0.5f;
 
     public void OnCreate(ref SystemState state)
     {
@@ -106,47 +128,40 @@ public partial struct AgentSystem : ISystem
 */
         NativeArray<Translation> positionMemory = m_WalkingAgents.ToComponentDataArray<Translation>(Allocator.Temp);
         NativeArray<Rotation> directionMemory = m_WalkingAgents.ToComponentDataArray<Rotation>(Allocator.Temp);
+        NativeParallelHashMap<Entity, BoidJobResults> boidResults =
+            new NativeParallelHashMap<Entity, BoidJobResults>(agentCount, Allocator.Temp);
+        // Schedule the job. Source generation creates and passes the query implicitly.
+        var boidjob = new boidJob()
+        {
+            positionMemory = positionMemory.AsReadOnly(),
+            directionMemory = directionMemory.AsReadOnly(),
+            results = boidResults.AsParallelWriter()
+        };
+        var boidJobHandle = boidjob.Schedule(state.Dependency);
+
+        positionMemory.Dispose(boidJobHandle);
+        directionMemory.Dispose(boidJobHandle);
+        wallDirection.Dispose(boidJobHandle);
+
+        NativeParallelHashMap<Entity, GateJobResults> gateResult =
+            new NativeParallelHashMap<Entity, GateJobResults>(agentCount, Allocator.Temp);
+
+        var gateJob = new gateJob()
+        {
+            results = gateResult.AsParallelWriter()
+        };
+        var gateJobHandle = gateJob.Schedule(state.Dependency);
 
 
-        var steerJob1 = Entities
-            .WithName("Steer")
-            .WithReadOnly(positionMemory)
-            .WithReadOnly(directionMemory)
-            .WithAll<WalkingTag>()
-            .ForEach((ref ApplyImpulse impulse, in LocalToWorld pos, in int entityInQueryIndex) => //in AgentInfo agent
-            {
-            })
-            .ScheduleParallel(initialPosArrayJobHandle); //getGateDirection
+        var impulsejob = new impulseApplyJob()
+        {
+            GateJobResults = gateResult.AsReadOnly(),
+            BoidJobResult = boidResults.AsReadOnly()
+        };
 
-        positionMemory.Dispose(steerJob1);
-        directionMemory.Dispose(steerJob1);
-        wallDirection.Dispose(steerJob1);
-        var steerJob2 = Entities
-            .WithName("SteerToGate")
-            .WithAll<WalkingTag, TargetGateEntity>()
-            .ForEach(
-                (ref ApplyImpulse impulse, in LocalToWorld IsPos,
-                    in TargetGatePosition TargetPos) => //in AgentInfo agent
-                {
-                    float3 direction = TargetPos.value - IsPos.Position;
-                    float3 newDirection;
-                    if (math.length(impulse.Direction) > 0.01f)
-                    {
-                        newDirection = (impulse.Direction * 0.3f) + (math.normalizesafe(direction) * 0.7f);
-                    }
-                    else
-                    {
-                        newDirection = direction;
-                    }
-
-                    impulse = new ApplyImpulse
-                    {
-                        Direction = math.normalizesafe(newDirection)
-                    };
-                }).ScheduleParallel(steerJob1);
-
-
-        state.Dependency = steerJob2;
+        state.Dependency = impulsejob.Schedule(JobHandle.CombineDependencies(boidJobHandle, gateJobHandle));
+        gateResult.Dispose(state.Dependency);
+        boidResults.Dispose(state.Dependency);
     }
 
     [BurstCompile]
@@ -170,33 +185,83 @@ public partial struct AgentSystem : ISystem
         }
     }
 
+    [WithAll(typeof(WalkingTag))]
+    [BurstCompile]
+    public partial struct impulseApplyJob : IJobEntity // it might be better to just do this in main thread... 
+
+    {
+        public NativeParallelHashMap<Entity, GateJobResults>.ReadOnly GateJobResults;
+        public NativeParallelHashMap<Entity, BoidJobResults>.ReadOnly BoidJobResult;
+
+        [BurstCompile]
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, ref ApplyImpulse impulse)
+
+        {
+            float3 newValue;
+
+            if (GateJobResults.ContainsKey(entity))
+            {
+                newValue = BoidJobResult[entity].avoid * aviodWeight +
+                           BoidJobResult[entity].algin * alignWeight +
+                           BoidJobResult[entity].group * groupingWeight +
+                           GateJobResults[entity].Direction * gateWeight;
+            }
+            else
+            {
+                newValue = BoidJobResult[entity].avoid * aviodWeight +
+                           BoidJobResult[entity].algin * alignWeight +
+                           BoidJobResult[entity].group * groupingWeight;
+            }
+
+
+            impulse.Direction = newValue;
+        }
+    }
 
     [WithAll(typeof(WalkingTag))]
     [BurstCompile]
-    public partial struct Steeringjob : IJobEntity
+    public partial struct gateJob : IJobEntity // it might be better to just do this in main thread... 
+
     {
+        public NativeParallelHashMap<Entity, GateJobResults>.ParallelWriter results;
+
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in Translation positionMemory,
-            in Rotation directionMemory)
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in Translation pos,
+            in TargetGateEntity TargetPos)
+        {
+            results.TryAdd(entity, new GateJobResults()
+            {
+                Direction = (TargetPos.pos - pos.Value)
+            });
+        }
+    }
+
+
+    [WithAll(typeof(WalkingTag))]
+    [BurstCompile]
+    public partial struct boidJob : IJobEntity
+    {
+        public NativeArray<Translation>.ReadOnly positionMemory;
+        public NativeArray<Rotation>.ReadOnly directionMemory;
+        public NativeParallelHashMap<Entity, BoidJobResults>.ParallelWriter results;
+
+        [BurstCompile]
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in Translation pos,
+            in Rotation dir)
         {
             const float minRaduis = 3f;
-            const float aviodWeight = 0.16f;
-
             const float maxAlignRadius = 15f;
-            const float alignWeight = 0.1f;
-
             const float maxGroupingRadius = 100.0f;
-            const float groupingWeight = 0.15f;
 
             uint avoidCount = 0;
-            float2 avoidVector = float2.zero;
+            float3 avoidVector = float3.zero;
             uint alignCount = 0;
-            float2 alignDirection = float2.zero;
+            float3 alignDirection = float3.zero;
             uint groupingCount = 0;
-            float2 groupingCenter = float2.zero;
+            float3 groupingCenter = float3.zero;
             for (int i = 0; i < positionMemory.Length; i++)
             {
-                float distance = math.length(pos.Position.xz - positionMemory[i]);
+                float distance = math.length(pos.Value - positionMemory[i].Value);
                 if (distance <= 0)
                 {
                     continue;
@@ -205,15 +270,17 @@ public partial struct AgentSystem : ISystem
 
                 #region AreTheyInFronOfMe
 
-                bool inFront = AngleDiff(pos.Forward,
-                    math.normalizesafe(positionMemory[i].ExtendTo3(pos.Position.y) - pos.Position));
+                float3 forwardVector = math.rotate(dir.Value, new float3(0f, 0f, 1f));
+                bool inFront = AngleDiff(forwardVector,
+                    math.normalizesafe(positionMemory[i].Value - pos.Value));
 
                 #endregion
 
 
                 #region DirectionAllignment
 
-                bool inLine = AngleDiff(pos.Forward, math.normalizesafe(directionMemory[i].ExtendTo3()));
+                float3 other_forwardVector = math.rotate(directionMemory[i].Value, new float3(0f, 0f, 1f));
+                bool inLine = AngleDiff(forwardVector, other_forwardVector);
 
                 #endregion
 
@@ -239,14 +306,12 @@ public partial struct AgentSystem : ISystem
 #endif
                     if (inLine)
                     {
-                        avoidVector += ((pos.Position.xz - positionMemory[i]) * avoidAdjust);
+                        avoidVector += (pos.Value - positionMemory[i].Value) * avoidAdjust;
                     }
                     else
                     {
-                        avoidVector +=
-                            ((pos.Position.xz -
-                              positionMemory
-                                  [i])); //if we go into the opposite direction it doesnt matter as much when they come close
+                        avoidVector += pos.Value - positionMemory[i].Value;
+                        //if we go into the opposite direction it doesnt matter as much when they come close
                     }
 
                     avoidCount++;
@@ -256,7 +321,7 @@ public partial struct AgentSystem : ISystem
                 {
                     if (inLine)
                     {
-                        alignDirection += directionMemory[i];
+                        alignDirection += other_forwardVector; //directionMemory[i];
                         alignCount++;
                     }
                 }
@@ -266,7 +331,7 @@ public partial struct AgentSystem : ISystem
                     if (inLine && inFront)
                     {
                         // Only if they go in the same direction do we want to go with them 
-                        groupingCenter += positionMemory[i];
+                        groupingCenter += positionMemory[i].Value;
                         groupingCount++;
                     }
                 }
@@ -275,13 +340,27 @@ public partial struct AgentSystem : ISystem
             groupingCenter /= groupingCount;
             alignDirection /= alignCount;
             avoidVector /= avoidCount;
+            BoidJobResults tmp = new BoidJobResults()
+                {
+                    avoid = math.normalizesafe(avoidVector),
+                    algin = math.normalizesafe(alignDirection),
+                    group = math.normalizesafe(groupingCenter - pos.Value)
+                }
+                ;
+            if (!results.TryAdd(entity, tmp))
+            {
+                Debug.Log("Failed to add somedata to re reulsts ");
+            }
+
 #if DEBUGDIRTEXT
 				Debug.Log(groupingCount.ToString() + " " + alignCount.ToString() + " " + avoidCount.ToString());
 #endif
-            float2 newValue = math.normalizesafe(
+            /*
+            float3 newValue = math.normalizesafe(
                 (math.normalizesafe(avoidVector) * aviodWeight +
                  math.normalizesafe(alignDirection) * alignWeight +
-                 math.normalizesafe(groupingCenter - pos.Position.xz) * groupingWeight));
+                 math.normalizesafe(groupingCenter - pos.Value) * groupingWeight));
+                 */
 
 #if DEBUGDIRECT
 				if (groupingCount > 0) {
@@ -299,12 +378,20 @@ public partial struct AgentSystem : ISystem
 #endif
 
 #if DEBUGWALL
-            Debug.DrawRay(pos.Position, newValue.ExtendTo3(), Color.green);
-            Debug.DrawRay(pos.Position, wallDirection[entityInQueryIndex].ExtendTo3(), Color.white);
-            Debug.DrawRay(pos.Position, (newValue * 0.5f + wallDirection[entityInQueryIndex] * 0.5f).ExtendTo3(),
-                Color.red);
+            // Debug.DrawRay(pos.Value, newValue., Color.green);
+            //   Debug.DrawRay(pos.Value, wallDirection[entityInQueryIndex].ExtendTo3(), Color.white);
+            //   Debug.DrawRay(pos.Value, (newValue * 0.5f + wallDirection[entityInQueryIndex] * 0.5f).ExtendTo3(),
+            //  Color.red);
 
 #endif
+            /*
+            impulse = new ApplyImpulse
+            {
+                Direction = newValue
+            };
+            */
+            /*
+             // I still need to fix the wall stuff later
             if (math.length(wallDirection[entityInQueryIndex]) > 0)
             {
                 impulse = new ApplyImpulse
@@ -316,9 +403,9 @@ public partial struct AgentSystem : ISystem
             {
                 impulse = new ApplyImpulse
                 {
-                    Direction = newValue.ExtendTo3()
+                    Direction = newValue;
                 };
-            }
+            }*/
         }
     }
 }

@@ -17,7 +17,7 @@ public partial struct GateCollisionHandle : ISystem
 {
     
     ComponentDataHandles m_Handles;
-
+    EntityCommandBuffer ecb ;
     struct ComponentDataHandles
     {
         
@@ -43,21 +43,21 @@ public partial struct GateCollisionHandle : ISystem
     }
     
     
-
-    private EntityQuery m_ActiveGates;
-   
+    
     [BurstCompile]
     public  void OnCreate(ref SystemState state)
     {
         m_Handles = new ComponentDataHandles(ref state);
-        m_ActiveGates = state.GetEntityQuery(new EntityQueryDesc
-        {
-            Any = new ComponentType[]
-          {
-                typeof(ActiveGate),
-                typeof(WalkingTag)
-          }
-        });
+        
+        var ecbSingleton =
+            SystemAPI.GetSingleton<
+                BeginSimulationEntityCommandBufferSystem.Singleton>();
+        
+       
+        
+        
+        ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+       
     }
 
     public void OnDestroy(ref SystemState state)
@@ -69,15 +69,13 @@ public partial struct GateCollisionHandle : ISystem
     {
       
         m_Handles.Update(ref state);
-        var ecbSingleton =
-            SystemAPI.GetSingleton<
-                BeginSimulationEntityCommandBufferSystem.Singleton>();
-        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
+        
+       
         state.Dependency = new TriggerGateJob
         {
             ActiveGatesGroup = state.GetComponentLookup<ActiveGate>(true),
-            WalkingTagGroup =  state.GetComponentLookup<WalkingTag>(),
-            AgentConfigurationGroup = state.GetComponentLookup<AgentConfiguration>(),
+            WalkingTagGroup =  state.GetComponentLookup<WalkingTag>(true),
+            AgentConfigurationGroup = state.GetComponentLookup<AgentConfiguration>(true),
             m_CmdBuffer = ecb
         }.Schedule(SystemAPI.GetSingleton<SimulationSingleton>(), state.Dependency);
         

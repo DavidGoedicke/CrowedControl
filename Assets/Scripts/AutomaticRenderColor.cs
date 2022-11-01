@@ -18,7 +18,6 @@ public partial class AutomaticRenderColor : SystemBase
     
     protected override void OnCreate() {
 
-        ecbS = World.GetOrCreateSystem<EntityCommandBufferSystem>();
     }
     protected override void OnUpdate()
     {/* ToDo: styart here r : https://docs.unity3d.com/Packages/com.unity.entities@0.17/manual/shared_component_data.html?q=RenderMesh

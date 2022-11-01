@@ -48,9 +48,7 @@ public class AgentAuthoring : MonoBehaviour
         GroupIndex = 0
     }; // TODO: This is by handAnd should be selected or automated
 
-    public bool LockX;
-    public bool LockY;
-    public bool LockZ;
+  
 
 }
 
@@ -70,6 +68,7 @@ public class AgentConversion : Baker<AgentAuthoring>
                 ViewingDistance = m.ViewingDistance,
                 ViewingFilter = m.ViewingFilter
             });
+            Debug.Log("I just converted an Agent");
     }
 }
     

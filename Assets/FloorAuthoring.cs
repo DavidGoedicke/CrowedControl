@@ -16,21 +16,25 @@ public struct IsFloorTag: IComponentData
 
 }
 [DisallowMultipleComponent]
-public class FloorAuthoring: MonoBehaviour, IConvertGameObjectToEntity
+public class FloorAuthoring: MonoBehaviour
 {
 
-	public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem) {
-		// Here we add all of the components needed to start the guard off in the "Patrol" state
-		// i.e. We add TargetPosition, and don't add IdleTimer or IsChasing tag
-		dstManager.AddComponents(entity, new ComponentTypeSet(
-			new ComponentType[] {
-				typeof(IsFloorTag)
-			}));
 
+}
+
+
+
+class FloorAuthoringBaker : Baker<FloorAuthoring>
+{
+	public override void Bake(FloorAuthoring authoring)
+	{
+		AddComponent(new IsFloorTag());
+		
 	}
 }
 
 
+/*
 
 public struct FloorVectorManager
 {
@@ -68,8 +72,8 @@ public struct FloorVectorManager
 		if (Vectors.ContainsKey(qPos)) {
 			return Vectors[qPos];
 		} else {
-			var world = m_BuildPhysicsWorldSystem.PhysicsWorld;
-			var collisionWorld = world.CollisionWorld;
+			
+			var collisionWorld = World.Coll;
 			float2 qPosReal = new float2(qPos) / GameVals.WallSuperSampling;
 
 			List<float2> wallList = new List<float2>();
@@ -129,3 +133,5 @@ public struct FloorVectorManager
 
 	private Dictionary<int2, float2> Vectors;
 }
+
+*/

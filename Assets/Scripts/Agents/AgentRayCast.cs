@@ -113,13 +113,13 @@ public partial struct AgentRayCast : ISystem
         foreach (var (gate, entity) in
                  SystemAPI.Query<RefRO<ActiveGate>>().WithEntityAccess())
         {
-            SignAndGateMemory[entity] = gate.ValueRO;
+            SignAndGateMemory[entity] = gate.ValueRO.value;
         }
          
         foreach (var (sign, entity) in
                  SystemAPI.Query<RefRO<ActiveSign>>().WithEntityAccess())
         {
-            SignAndGateMemory[entity] = sign.ValueRO;
+            SignAndGateMemory[entity] = sign.ValueRO.value;
         }
         
         var ecbSingleton = SystemAPI.GetSingleton<
