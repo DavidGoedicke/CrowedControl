@@ -48,27 +48,27 @@ public class AgentAuthoring : MonoBehaviour
         GroupIndex = 0
     }; // TODO: This is by handAnd should be selected or automated
 
-  
-
-}
-
-
-
-
-[DisallowMultipleComponent]
-public class AgentConversion : Baker<AgentAuthoring>
-{
-
-    public override void Bake(AgentAuthoring m)
+    public class Baker : Baker<AgentAuthoring>
     {
-        // This simple baker adds just one component to the entity.
-        AddComponent( new AgentConfiguration {
+
+        public override void Bake(AgentAuthoring m)
+        {
+            Debug.Log("Bake one unit");
+            // This simple baker adds just one component to the entity.
+            AddComponent( new AgentConfiguration {
                 Speed = m.speed,
                 TargetGate = m.SelectTargetGate,
                 ViewingDistance = m.ViewingDistance,
                 ViewingFilter = m.ViewingFilter
             });
-            Debug.Log("I just converted an Agent");
+            
+            AddComponent(new WasBornTag());
+        }
     }
 }
+
+
+
+
+
     

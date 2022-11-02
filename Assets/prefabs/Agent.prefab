@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 488952}
   - component: {fileID: 3335808}
   - component: {fileID: 2305530}
-  - component: {fileID: 1152904188580969820}
   - component: {fileID: 53483931}
   - component: {fileID: 8895194622247875018}
   - component: {fileID: 5695411539073509523}
@@ -35,7 +34,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: -69.752, z: 0}
 --- !u!33 &3335808
 MeshFilter:
@@ -87,19 +86,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!114 &1152904188580969820
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 162976}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ea7d7495833204790ba1d3a8755397f8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  ConversionMode: 0
 --- !u!114 &53483931
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -133,9 +119,9 @@ MonoBehaviour:
     y: 0
     z: 0
   m_PrimitiveSize:
-    x: 1
+    x: 1.0000002
     y: 1
-    z: 1
+    z: 1.0000002
   m_PrimitiveOrientation:
     Value:
       x: -0
@@ -143,16 +129,16 @@ MonoBehaviour:
       z: 0
     RotationOrder: 4
   m_Capsule:
-    Height: 1
-    Radius: 0.5
+    Height: 1.0000002
+    Radius: 0.5000001
     Axis: 2
   m_Cylinder:
-    Height: 1
-    Radius: 0.5
+    Height: 1.0000002
+    Radius: 0.5000001
     Axis: 2
   m_CylinderSideCount: 20
-  m_SphereRadius: 0.5
-  m_MinimumSkinnedVertexWeight: 0.1
+  m_SphereRadius: 0.5000001
+  m_MinimumSkinnedVertexWeight: 0.492
   m_ConvexHullGenerationParameters:
     m_SimplificationTolerance: 0.015
     m_BevelRadius: 0.05

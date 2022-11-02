@@ -50,11 +50,11 @@ public partial struct ApplyAgentMotion : ISystem
         public void Execute(Entity _entity,
             ref RigidBodyAspect rigidBodyAspect,
             in ApplyImpulse _applyImpulseOnKeyData,
-            in Rotation rot,
+            
             in AgentConfiguration ac)
         {
             /// Apply a linear impulse to the entity.
-            rigidBodyAspect.ApplyLinearImpulseLocalSpace(_applyImpulseOnKeyData.Direction * DeltaTime * 0.5f);
+            //rigidBodyAspect.ApplyLinearImpulseLocalSpace(_applyImpulseOnKeyData.Direction  * 0.001f);
 
             if (math.length(rigidBodyAspect.LinearVelocity) > ac.Speed)
             {
@@ -62,8 +62,8 @@ public partial struct ApplyAgentMotion : ISystem
                 temp = math.normalize(temp) * ac.Speed;
                 rigidBodyAspect.LinearVelocity = temp;
             }
-
-            var fwd = math.rotate(rot.Value, new float3(0f, 0f, 1f));
+           Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString());
+            var fwd = math.rotate( rigidBodyAspect.Rotation, new float3(0f, 0f, 1f));
 
             float2 A = math.normalize(fwd.xz);
             float2 B = math.normalize(_applyImpulseOnKeyData.Direction.xz);
@@ -74,9 +74,9 @@ public partial struct ApplyAgentMotion : ISystem
             angleDiff = (math.cross(fwd, _applyImpulseOnKeyData.Direction)).y < 0 ? -angleDiff : angleDiff;
 #if DEBUGMOTION
             //Debug.Log(math.degrees(angleDiff) + "<=Angle : lanrg =>"+"  DotProduct =>"+A.ToString()+B.ToString()+ _applyImpulseOnKeyData.Direction.x.ToString());
-            Debug.DrawRay(ltw.Position , new Vector3(A.x,0,A.y) , Color.green);
-            Debug.DrawRay(ltw.Position, new Vector3(B.x,0, B.y), Color.red);
-            Debug.DrawRay(ltw.Position, ltw.Right *angleDiff*10, Color.cyan);
+            Debug.DrawRay(rigidBodyAspect.Position , new Vector3(A.x,0,A.y) , Color.green);
+            Debug.DrawRay(rigidBodyAspect.Position, new Vector3(B.x,0, B.y), Color.red);
+          //  Debug.DrawRay(rigidBodyAspect.Position, rigidBodyAspect.Right *angleDiff*10, Color.cyan);
             //Debug.Log(math.degrees(angleDiff));
 #endif
 

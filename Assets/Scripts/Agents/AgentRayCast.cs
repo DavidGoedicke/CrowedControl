@@ -8,20 +8,19 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Physics;
 using Unity.Physics.Systems;
+using UnityEngine;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateBefore(typeof(PhysicsSystemGroup))]
 [BurstCompile]
 public partial struct AgentRayCast : ISystem
 {
-    
-    
     [WithNone(typeof(TargetGateEntity))]
     [BurstCompile]
     public partial struct CastRayJob : IJobEntity
     {
         public PhysicsWorldSingleton World;
-        public  NativeParallelHashMap<Entity, GateNums> SignAndGateMemory;
+        public NativeParallelHashMap<Entity, GateNums> SignAndGateMemory;
         public EntityCommandBuffer.ParallelWriter Ecb;
 
         [BurstCompile]
@@ -37,7 +36,7 @@ public partial struct AgentRayCast : ISystem
                     Debug.DrawRay(rayStart, rayEnd - rayStart);
 #endif
 
-
+Debug.Log("Ray Legnth"+math.length(rayEnd-rayStart)+"  "+rayStart.ToString());
             var raycastInput = new RaycastInput
             {
                 Start = rayStart,
@@ -56,8 +55,8 @@ public partial struct AgentRayCast : ISystem
 #endif
                     if (SignAndGateMemory[rayResult.Entity] == agentConfiguration.TargetGate)
                     {
-                        Ecb.AddComponent<TargetGateEntity>(chunkIndex,entity, new TargetGateEntity { value = rayResult.Entity, pos= rayResult.Position });
-                      
+                        Ecb.AddComponent<TargetGateEntity>(chunkIndex, entity,
+                            new TargetGateEntity { value = rayResult.Entity, pos = rayResult.Position });
                     }
                 }
                 else
@@ -70,23 +69,35 @@ public partial struct AgentRayCast : ISystem
         }
     }
 
-
+     
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
         var builder = new EntityQueryBuilder(Allocator.Temp);
         builder.WithAny<ActiveGate>();
         GateQuery = state.GetEntityQuery(builder);
-        
+
         
         builder = new EntityQueryBuilder(Allocator.Temp);
         builder.WithAny<ActiveSign>();
         SignQuery = state.GetEntityQuery(builder);
-        
+
         ActiveGateHandle = state.GetComponentTypeHandle<ActiveGate>();
         ActiveSignHandle = state.GetComponentTypeHandle<ActiveSign>();
+
+        if (!SystemAPI.TryGetSingleton(out ecbSingleton))
+        {
+            tryagain = true;
+            Debug.Log("Agent raycast could not grab the BeginSimulationEntityCommandBufferSystem singelton");
+        }
     }
 
+    private bool tryagain;
+    BeginSimulationEntityCommandBufferSystem.Singleton ecbSingleton ;
+    
+    
+    
+    
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
@@ -96,42 +107,56 @@ public partial struct AgentRayCast : ISystem
     private EntityQuery SignQuery;
     private ComponentTypeHandle<ActiveGate> ActiveGateHandle;
     private ComponentTypeHandle<ActiveSign> ActiveSignHandle;
+
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+
+        if (tryagain)
+        {
+            tryagain = !SystemAPI.TryGetSingleton(out ecbSingleton);
+            return;
+        }
         ActiveGateHandle.Update(ref state);
         ActiveSignHandle.Update(ref state);
-        
-        PhysicsWorldSingleton physicsWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
+
 
         var gateCount = GateQuery.CalculateEntityCount();
         var TargetCount = gateCount + SignQuery.CalculateEntityCount();
-        
+
         var SignAndGateMemory = new NativeParallelHashMap<Entity, GateNums>(TargetCount, Allocator.TempJob);
-           
-        
+
+
         foreach (var (gate, entity) in
                  SystemAPI.Query<RefRO<ActiveGate>>().WithEntityAccess())
         {
             SignAndGateMemory[entity] = gate.ValueRO.value;
         }
-         
+
         foreach (var (sign, entity) in
                  SystemAPI.Query<RefRO<ActiveSign>>().WithEntityAccess())
         {
             SignAndGateMemory[entity] = sign.ValueRO.value;
         }
+
         
-        var ecbSingleton = SystemAPI.GetSingleton<
-            BeginSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
         // Version that schedules a job
-        state.Dependency = new CastRayJob
+
+
+        if (SystemAPI.TryGetSingleton(out PhysicsWorldSingleton physicsWorldSingleton)){
+            // var world = physicsWorldSingleton.CollisionWorld;
+
+            state.Dependency = new CastRayJob
+            {
+                World = physicsWorldSingleton,
+                SignAndGateMemory = SignAndGateMemory,
+                Ecb = ecb.AsParallelWriter()
+            }.Schedule(state.Dependency);
+        }else
         {
-            World = physicsWorldSingleton,
-            SignAndGateMemory = SignAndGateMemory,
-            Ecb = ecb.AsParallelWriter()
-        }.Schedule(state.Dependency);
+            Debug.Log("Failed to get physics world. Maybe there are more then one hmm...");
+        }
 //ToDo ECB should be scheduled?? 
     }
 }

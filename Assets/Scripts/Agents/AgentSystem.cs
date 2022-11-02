@@ -1,6 +1,6 @@
-// #define DEBUGDIRECT
+#define DEBUGDIRECT
 //	#define DEBUGDIRTEXT
-
+//#define DEBUGMEMEORY
 #define DEBUGWALL
 
 using System.Collections.Generic;
@@ -75,10 +75,13 @@ public partial struct AgentSystem : ISystem
         m_Handles = new ComponentDataHandles(ref state);
 
         var builder = new EntityQueryBuilder(Allocator.Temp);
-        builder.WithAny<WalkingTag>();
+
         builder.WithNone<WasBornTag, ArrivedTag>();
+        builder.WithAll<WalkingTag, Translation, Rotation>();
         m_WalkingAgents = state.GetEntityQuery(builder);
 
+
+        Debug.Log("AgentSystem Created");
         //floorVectorManager.Init(
         //     World.GetOrCreateSystem<BuildPhysicsWorld>(),
         //     World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>()
@@ -89,16 +92,19 @@ public partial struct AgentSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
+        Debug.Log("AgentSystem update");
         m_Handles.Update(ref state);
         var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
-        var temp = new Unity.Mathematics.Random();
-        foreach (var (wbt, pos, entity) in SystemAPI.Query<WasBornTag, LocalToWorld>().WithEntityAccess())
+
+        foreach (var (wbt, dir, entity) in SystemAPI.Query<WasBornTag, RefRO<Rotation>>().WithEntityAccess())
         {
             ecb.RemoveComponent<WasBornTag>(entity);
             ecb.AddComponent<WalkingTag>(entity);
+            var tmp = math.rotate(dir.ValueRO.Value, new float3(0f, 0f, 1f));
             ecb.AddComponent<ApplyImpulse>(entity,
-                new ApplyImpulse { Direction = pos.Forward });
+                new ApplyImpulse { Direction = tmp });
+            Debug.Log("Converted on Unit");
         }
 
 
@@ -107,6 +113,7 @@ public partial struct AgentSystem : ISystem
         if (agentCount == 0)
         {
             // We dont need to spawn a bunch of jobs if nothing needs to be done.
+            Debug.Log("Skipping since there are no agents ;-( ");
             return;
         }
 
@@ -126,10 +133,16 @@ public partial struct AgentSystem : ISystem
             })
             .Run();
 */
-        NativeArray<Translation> positionMemory = m_WalkingAgents.ToComponentDataArray<Translation>(Allocator.Temp);
-        NativeArray<Rotation> directionMemory = m_WalkingAgents.ToComponentDataArray<Rotation>(Allocator.Temp);
+#if DEBUGMEMEORY
+        Debug.Log("Will Allocate memory for Agent system");
+#endif
+        NativeArray<Translation> positionMemory = m_WalkingAgents.ToComponentDataArray<Translation>(Allocator.TempJob);
+        NativeArray<Rotation> directionMemory = m_WalkingAgents.ToComponentDataArray<Rotation>(Allocator.TempJob);
         NativeParallelHashMap<Entity, BoidJobResults> boidResults =
-            new NativeParallelHashMap<Entity, BoidJobResults>(agentCount, Allocator.Temp);
+            new NativeParallelHashMap<Entity, BoidJobResults>(agentCount, Allocator.TempJob);
+#if DEBUGMEMEORY
+        Debug.Log("Finished memory for Agent system");
+#endif
         // Schedule the job. Source generation creates and passes the query implicitly.
         var boidjob = new boidJob()
         {
@@ -138,21 +151,30 @@ public partial struct AgentSystem : ISystem
             results = boidResults.AsParallelWriter()
         };
         var boidJobHandle = boidjob.Schedule(state.Dependency);
-
+#if DEBUGMEMEORY
+        Debug.Log("Scheduled boid job");
+#endif
         positionMemory.Dispose(boidJobHandle);
         directionMemory.Dispose(boidJobHandle);
         wallDirection.Dispose(boidJobHandle);
-
+#if DEBUGMEMEORY
+        Debug.Log("Scheduling Dispose of memoery");
+#endif
         NativeParallelHashMap<Entity, GateJobResults> gateResult =
-            new NativeParallelHashMap<Entity, GateJobResults>(agentCount, Allocator.Temp);
+            new NativeParallelHashMap<Entity, GateJobResults>(agentCount, Allocator.TempJob);
+
+#if DEBUGMEMEORY
+        Debug.Log("Finished allocation of GateJobresult hasmap");
+#endif
 
         var gateJob = new gateJob()
         {
             results = gateResult.AsParallelWriter()
         };
         var gateJobHandle = gateJob.Schedule(state.Dependency);
-
-
+#if DEBUGMEMEORY
+        Debug.Log("Scheduled gate job");
+#endif
         var impulsejob = new impulseApplyJob()
         {
             GateJobResults = gateResult.AsReadOnly(),
@@ -160,8 +182,14 @@ public partial struct AgentSystem : ISystem
         };
 
         state.Dependency = impulsejob.Schedule(JobHandle.CombineDependencies(boidJobHandle, gateJobHandle));
+#if DEBUGMEMEORY
+        Debug.Log("Scheduled Impulse job");
+#endif
         gateResult.Dispose(state.Dependency);
         boidResults.Dispose(state.Dependency);
+#if DEBUGMEMEORY
+        Debug.Log("Disposing result Arrays");
+#endif
     }
 
     [BurstCompile]
@@ -194,25 +222,38 @@ public partial struct AgentSystem : ISystem
         public NativeParallelHashMap<Entity, BoidJobResults>.ReadOnly BoidJobResult;
 
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, ref ApplyImpulse impulse)
-
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, ref ApplyImpulse impulse
+#if DEBUGDIRECT
+            , in Translation pos)
+#else
+                )
+#endif
         {
             float3 newValue;
 
             if (GateJobResults.ContainsKey(entity))
             {
                 newValue = BoidJobResult[entity].avoid * aviodWeight +
-                           BoidJobResult[entity].algin * alignWeight +
-                           BoidJobResult[entity].group * groupingWeight +
-                           GateJobResults[entity].Direction * gateWeight;
+                                          BoidJobResult[entity].algin * alignWeight +
+                                          BoidJobResult[entity].group * groupingWeight +
+                                          GateJobResults[entity].Direction * gateWeight;
             }
             else
             {
                 newValue = BoidJobResult[entity].avoid * aviodWeight +
-                           BoidJobResult[entity].algin * alignWeight +
-                           BoidJobResult[entity].group * groupingWeight;
+                                          BoidJobResult[entity].algin * alignWeight +
+                                          BoidJobResult[entity].group * groupingWeight;
             }
+#if DEBUGDIRECT
 
+            Debug.DrawRay(pos.Value, (BoidJobResult[entity].group - pos.Value) * groupingWeight, Color.black);
+
+            Debug.DrawRay(pos.Value, BoidJobResult[entity].algin * 10 * alignWeight, Color.green);
+
+            Debug.DrawRay(pos.Value, BoidJobResult[entity].avoid * 10 * aviodWeight, Color.red);
+
+
+#endif
 
             impulse.Direction = newValue;
         }
@@ -286,17 +327,21 @@ public partial struct AgentSystem : ISystem
 
                 float avoidAdjust = distance.MapRange(0, minRaduis, 2, 0.0001f);
 #if DEBUGDIRECT
-					Color c = Color.red;
-					if (inLine && !inFront) {
-						c = Color.green;
-					} else if (inLine && inFront) {
-						c = Color.cyan;
-						
-					} else if (! inLine && inFront) {
-						c = Color.magenta;
-					}
-					//Debug.DrawLine(pos.Position, positionMemory[i].ExtendTo3(pos.Position.y), c);
-					//if(avoidAdjust>0) Debug.DrawRay(pos.Position, new float3(0, avoidAdjust * 100, 0), Color.white);
+                Color c = Color.red;
+                if (inLine && !inFront)
+                {
+                    c = Color.green;
+                }
+                else if (inLine && inFront)
+                {
+                    c = Color.cyan;
+                }
+                else if (!inLine && inFront)
+                {
+                    c = Color.magenta;
+                }
+                //Debug.DrawLine(pos.Position, positionMemory[i].ExtendTo3(pos.Position.y), c);
+                //if(avoidAdjust>0) Debug.DrawRay(pos.Position, new float3(0, avoidAdjust * 100, 0), Color.white);
 #endif
 
                 if (distance <= minRaduis)
@@ -362,20 +407,6 @@ public partial struct AgentSystem : ISystem
                  math.normalizesafe(groupingCenter - pos.Value) * groupingWeight));
                  */
 
-#if DEBUGDIRECT
-				if (groupingCount > 0) {
-					Debug.DrawRay(pos.Position, (groupingCenter.ExtendTo3(pos.Position.y) - pos.Position) * groupingWeight, Color.black) ;
-				}
-				
-				if (alignCount > 0) {
-					Debug.DrawRay(pos.Position, alignDirection.ExtendTo3() * 10 * alignWeight, Color.green);
-				}
-				if (avoidCount > 0) {
-					Debug.DrawRay(pos.Position, avoidVector.ExtendTo3() * 10 * aviodWeight, Color.red);
-				}
-				Debug.DrawRay(pos.Position, newValue.ExtendTo3() * 10 * aviodWeight, Color.white);
-
-#endif
 
 #if DEBUGWALL
             // Debug.DrawRay(pos.Value, newValue., Color.green);

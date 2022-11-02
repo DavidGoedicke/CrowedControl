@@ -8,21 +8,22 @@ using Unity.Entities;
 
 public class GateAuthoring : MonoBehaviour
 {
-
-
+    
     public GateNums PublicGateNumber;
+    
+    class GateAuthoringBaker : Baker<GateAuthoring>
+    {
+        public override void Bake(GateAuthoring authoring)
+        {
+            AddComponent(new ActiveGate
+            {
+                value = authoring.PublicGateNumber
+            });
+
+
+        }
+    }
+    
     
 }
 
-class GateAuthoringBaker : Baker<GateAuthoring>
-{
-    public override void Bake(GateAuthoring authoring)
-    {
-        AddComponent(new ActiveGate
-        {
-            value = authoring.PublicGateNumber
-        });
-
-
-    }
-}
