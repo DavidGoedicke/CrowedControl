@@ -50,20 +50,31 @@ public partial struct ApplyAgentMotion : ISystem
         public void Execute(Entity _entity,
             ref RigidBodyAspect rigidBodyAspect,
             in ApplyImpulse _applyImpulseOnKeyData,
-            
             in AgentConfiguration ac)
         {
             /// Apply a linear impulse to the entity.
-            //rigidBodyAspect.ApplyLinearImpulseLocalSpace(_applyImpulseOnKeyData.Direction  * 0.001f);
+          
+            if (math.length(_applyImpulseOnKeyData.Direction) <= 0.0f) // if we are alone sometimes there is no directio
+            {
+                rigidBodyAspect.ApplyLinearImpulseWorldSpace(math.forward(rigidBodyAspect.Rotation) *DeltaTime  );
+            }
+            else
+            {
+
+                rigidBodyAspect.ApplyLinearImpulseWorldSpace(_applyImpulseOnKeyData.Direction * 10 * DeltaTime);
+            }
 
             if (math.length(rigidBodyAspect.LinearVelocity) > ac.Speed)
             {
                 float3 temp = rigidBodyAspect.LinearVelocity;
                 temp = math.normalize(temp) * ac.Speed;
                 rigidBodyAspect.LinearVelocity = temp;
+                
             }
-           Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString());
-            var fwd = math.rotate( rigidBodyAspect.Rotation, new float3(0f, 0f, 1f));
+            
+            
+         //  Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString()+" Direction:"+math.length(_applyImpulseOnKeyData.Direction).ToString());
+            var fwd = math.forward( rigidBodyAspect.Rotation);
 
             float2 A = math.normalize(fwd.xz);
             float2 B = math.normalize(_applyImpulseOnKeyData.Direction.xz);
@@ -72,6 +83,7 @@ public partial struct ApplyAgentMotion : ISystem
             float dotProduct = math.dot(A, B);
             float angleDiff = math.acos(dotProduct);
             angleDiff = (math.cross(fwd, _applyImpulseOnKeyData.Direction)).y < 0 ? -angleDiff : angleDiff;
+
 #if DEBUGMOTION
             //Debug.Log(math.degrees(angleDiff) + "<=Angle : lanrg =>"+"  DotProduct =>"+A.ToString()+B.ToString()+ _applyImpulseOnKeyData.Direction.x.ToString());
             Debug.DrawRay(rigidBodyAspect.Position , new Vector3(A.x,0,A.y) , Color.green);
@@ -80,14 +92,14 @@ public partial struct ApplyAgentMotion : ISystem
             //Debug.Log(math.degrees(angleDiff));
 #endif
 
-            if (angleDiff >= -math.PI && angleDiff <= math.PI)
-            {
+          //  if (angleDiff >= -math.PI && angleDiff <= math.PI)
+         //   {
                 float multiplyer = 0.025f;
                 float rotationSpeed = math.length(rigidBodyAspect.AngularVelocityLocalSpace);
 
                 rigidBodyAspect.ApplyAngularImpulseLocalSpace(new float3(0,
                     angleDiff * math.clamp(rotationSpeed.MapRange(0f, 1f, multiplyer, 0f), multiplyer, 0f), 0));
-            }
+         //   }
         }
     }
 }

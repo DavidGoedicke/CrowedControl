@@ -1,6 +1,7 @@
-#define DEBUGDIRECT
+//#define DEBUGDIRECT
 //	#define DEBUGDIRTEXT
 //#define DEBUGMEMEORY
+
 #define DEBUGWALL
 
 using System.Collections.Generic;
@@ -24,6 +25,7 @@ public partial struct AgentSystem : ISystem
         public float3 algin;
         public float3 group;
     }
+
 
     public struct GateJobResults
     {
@@ -60,15 +62,14 @@ public partial struct AgentSystem : ISystem
         }
     }
 
-    //  FloorVectorManager floorVectorManager;
-
 
     private EntityQuery m_WalkingAgents;
     ComponentDataHandles m_Handles;
-    const float aviodWeight = 0.16f;
-    const float alignWeight = 0.1f;
-    const float groupingWeight = 0.15f;
-    const float gateWeight = 0.5f;
+    private const float aviodWeight = 0.16f;
+    private const float alignWeight = 0.1f;
+    private const float groupingWeight = 0.15f;
+    private const float gateWeight = 0.5f;
+    private const float wallWeight = 0f;//.25f;
 
     public void OnCreate(ref SystemState state)
     {
@@ -82,17 +83,12 @@ public partial struct AgentSystem : ISystem
 
 
         Debug.Log("AgentSystem Created");
-        //floorVectorManager.Init(
-        //     World.GetOrCreateSystem<BuildPhysicsWorld>(),
-        //     World.GetOrCreateSystem<EndSimulationEntityCommandBufferSystem>()
-        // );
     }
 
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        Debug.Log("AgentSystem update");
         m_Handles.Update(ref state);
         var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
@@ -101,10 +97,9 @@ public partial struct AgentSystem : ISystem
         {
             ecb.RemoveComponent<WasBornTag>(entity);
             ecb.AddComponent<WalkingTag>(entity);
-            var tmp = math.rotate(dir.ValueRO.Value, new float3(0f, 0f, 1f));
-            ecb.AddComponent<ApplyImpulse>(entity,
-                new ApplyImpulse { Direction = tmp });
-            Debug.Log("Converted on Unit");
+            ecb.AddComponent(entity, new WallAvoidVector { Value = float2.zero });
+            ecb.AddComponent(entity,
+                new ApplyImpulse { Direction = math.forward(dir.ValueRO.Value) });
         }
 
 
@@ -113,26 +108,14 @@ public partial struct AgentSystem : ISystem
         if (agentCount == 0)
         {
             // We dont need to spawn a bunch of jobs if nothing needs to be done.
-            Debug.Log("Skipping since there are no agents ;-( ");
+            Debug.Log("Skipping since there are no agents. probably the first frame. ");
             return;
         }
 
         float deltaTime = SystemAPI.Time.DeltaTime;
 
-        var wallDirection =
-            new NativeArray<float2>(agentCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-/*
-        Entities
-            .WithoutBurst()
-            .WithAll<WalkingTag>()
-            .WithName("WallAsignandCalc")
-            .ForEach((int entityInQueryIndex, in LocalToWorld pos) =>
-            {
-                wallDirection[entityInQueryIndex] =
-                //    floorVectorManager.WallVector(new float2(pos.Position.x, pos.Position.z));
-            })
-            .Run();
-*/
+      
+
 #if DEBUGMEMEORY
         Debug.Log("Will Allocate memory for Agent system");
 #endif
@@ -156,7 +139,7 @@ public partial struct AgentSystem : ISystem
 #endif
         positionMemory.Dispose(boidJobHandle);
         directionMemory.Dispose(boidJobHandle);
-        wallDirection.Dispose(boidJobHandle);
+      
 #if DEBUGMEMEORY
         Debug.Log("Scheduling Dispose of memoery");
 #endif
@@ -222,31 +205,44 @@ public partial struct AgentSystem : ISystem
         public NativeParallelHashMap<Entity, BoidJobResults>.ReadOnly BoidJobResult;
 
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, ref ApplyImpulse impulse
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, ref ApplyImpulse impulse,
+            in WallAvoidVector wav
 #if DEBUGDIRECT
             , in Translation pos)
 #else
-                )
+        )
 #endif
         {
-            float3 newValue;
-
+            float3 newValue = float3.zero;
+            float3 GateDirection = float3.zero;
             if (GateJobResults.ContainsKey(entity))
             {
-                newValue = BoidJobResult[entity].avoid * aviodWeight +
-                                          BoidJobResult[entity].algin * alignWeight +
-                                          BoidJobResult[entity].group * groupingWeight +
-                                          GateJobResults[entity].Direction * gateWeight;
+                GateDirection = GateJobResults[entity].Direction;
             }
-            else
-            {
-                newValue = BoidJobResult[entity].avoid * aviodWeight +
-                                          BoidJobResult[entity].algin * alignWeight +
-                                          BoidJobResult[entity].group * groupingWeight;
-            }
-#if DEBUGDIRECT
 
-            Debug.DrawRay(pos.Value, (BoidJobResult[entity].group - pos.Value) * groupingWeight, Color.black);
+            newValue = (BoidJobResult[entity].avoid * aviodWeight) +
+                       (BoidJobResult[entity].algin * alignWeight) +
+                       (BoidJobResult[entity].group * groupingWeight) +
+                       (GateDirection * gateWeight);
+            if (math.length(wav.Value) > 0)
+            {
+                
+                float3 WallAvoidVector =  math.rotate(quaternion.AxisAngle(new float3(0, 1, 0), math.PI / 2) , wav.Value.ExtendTo3());
+
+                WallAvoidVector =  AngleDiff(newValue, WallAvoidVector) ?  WallAvoidVector : -WallAvoidVector;
+#if DEBUGDIRECT
+                    Debug.DrawRay(pos.Value,WallAvoidVector*10,Color.magenta);
+#endif
+                    newValue += WallAvoidVector * 0.1f;
+                    newValue += wav.Value.ExtendTo3() * 0.05f;
+            }
+
+
+
+
+#if DEBUGDIRECT
+            Debug.Log(BoidJobResult[entity].avoid.ToString()+"     "+ BoidJobResult[entity].algin.ToString()+"    "+BoidJobResult[entity].group.ToString());
+            Debug.DrawRay(pos.Value, (BoidJobResult[entity].group) * groupingWeight, Color.black);
 
             Debug.DrawRay(pos.Value, BoidJobResult[entity].algin * 10 * alignWeight, Color.green);
 
@@ -256,6 +252,7 @@ public partial struct AgentSystem : ISystem
 #endif
 
             impulse.Direction = newValue;
+           
         }
     }
 

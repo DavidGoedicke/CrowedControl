@@ -34,9 +34,10 @@ public partial struct AgentRayCast : ISystem
 
 #if DEBUGRAY
                     Debug.DrawRay(rayStart, rayEnd - rayStart);
+                    Debug.Log("Ray Legnth"+math.length(rayEnd-rayStart)+"  "+rayStart);
 #endif
 
-Debug.Log("Ray Legnth"+math.length(rayEnd-rayStart)+"  "+rayStart.ToString());
+
             var raycastInput = new RaycastInput
             {
                 Start = rayStart,

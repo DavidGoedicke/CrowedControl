@@ -8,7 +8,10 @@ using Unity.Physics.Systems;
 using Unity.Physics.Authoring;
 
 
-
+public struct WallAvoidVector: IComponentData
+{
+    public float2 Value;
+}
 public struct WasBornTag : IComponentData{ }
 public struct WalkingTag : IComponentData{ }
 public struct ArrivedTag : IComponentData{ }

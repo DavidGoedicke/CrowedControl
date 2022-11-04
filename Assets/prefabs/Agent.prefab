@@ -34,7 +34,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 43
   m_LocalEulerAnglesHint: {x: 0, y: -69.752, z: 0}
 --- !u!33 &3335808
 MeshFilter:
@@ -154,7 +154,7 @@ MonoBehaviour:
     m_Friction:
       m_Override: 0
       m_Value:
-        Value: 0.5
+        Value: 0.064
         CombineMode: 0
     m_Restitution:
       m_Override: 0
@@ -270,7 +270,7 @@ MonoBehaviour:
     y: 0
     z: 0
   m_GravityFactor: 1
-  m_OverrideDefaultMassDistribution: 0
+  m_OverrideDefaultMassDistribution: 1
   m_CenterOfMass:
     x: 0
     y: 0
@@ -282,9 +282,9 @@ MonoBehaviour:
       z: 0
     RotationOrder: 4
   m_InertiaTensor:
-    x: 0.4
+    x: Infinity
     y: 0.4
-    z: 0.4
+    z: Infinity
   m_WorldIndex: 0
   m_CustomTags:
     Tag00: 0
