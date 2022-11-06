@@ -62,21 +62,21 @@ public partial class FloorVectorManager : SystemBase
             }
             else
             {
-                float2 qPosReal = new float2(qPos) / GameVals.WallSuperSampling;
+                float2 qPosReal = new float2(qPos) / FixedGameValues.WallSuperSampling;
 
                 List<float2> wallList = new List<float2>();
-                for (float x = qPosReal.x - GameVals.WallViewSize;
-                     x < (qPosReal.x + GameVals.WallViewSize);
-                     x += ((float)1.0f / GameVals.WallSuperSampling))
+                for (float x = qPosReal.x - FixedGameValues.WallViewSize;
+                     x < (qPosReal.x + FixedGameValues.WallViewSize);
+                     x += ((float)1.0f / FixedGameValues.WallSuperSampling))
                 {
-                    for (float z = qPosReal.y - GameVals.WallViewSize;
-                         z < (qPosReal.y + GameVals.WallViewSize);
-                         z += ((float)1.0f / GameVals.WallSuperSampling))
+                    for (float z = qPosReal.y - FixedGameValues.WallViewSize;
+                         z < (qPosReal.y + FixedGameValues.WallViewSize);
+                         z += ((float)1.0f / FixedGameValues.WallSuperSampling))
                     {
                         var raycastInput = new RaycastInput
                         {
-                            Start = new float3(x, GameVals.WallHeight, z),
-                            End = new float3(x, -GameVals.WallHeight, z),
+                            Start = new float3(x, FixedGameValues.WallHeight, z),
+                            End = new float3(x, -FixedGameValues.WallHeight, z),
                             Filter = WallCollisionFilter
                         };
 
@@ -106,7 +106,7 @@ public partial class FloorVectorManager : SystemBase
                     {
                         float2 vec = qPosReal - elem;
                         AvoidDirection += math.normalizesafe(vec) * Util.MapRange(math.length(vec),
-                            0, math.length(new float2(GameVals.WallViewSize, GameVals.WallViewSize))
+                            0, math.length(new float2(FixedGameValues.WallViewSize, FixedGameValues.WallViewSize))
                             , 1, 0.01f);
                     }
                     //AvoidDirection /= wallList.Count;
@@ -125,7 +125,7 @@ public partial class FloorVectorManager : SystemBase
 
     private static int2 Quantize(float3 pos)
     {
-        pos *= GameVals.WallSuperSampling;
+        pos *= FixedGameValues.WallSuperSampling;
         return new int2(math.round(pos.xz));
     }
 

@@ -25,6 +25,7 @@ public partial struct GateCollisionHandle : ISystem
         public ComponentLookup<ActiveGate> ActiveGatesGroup;
         public ComponentLookup<WalkingTag> WalkingTagGroup;
         public ComponentLookup<AgentConfiguration> AgentConfigurationGroup;
+        
 
 
         public ComponentDataHandles(ref SystemState state)
@@ -78,7 +79,6 @@ public partial struct GateCollisionHandle : ISystem
             m_CmdBuffer =  ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged)
         }.Schedule(SystemAPI.GetSingleton<SimulationSingleton>(), state.Dependency);
         
-        Debug.Log("Gate Collision Finished");
     }
 
     [BurstCompile]

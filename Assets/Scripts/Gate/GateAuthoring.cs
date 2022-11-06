@@ -2,8 +2,13 @@
 
 using UnityEngine;
 using Unity.Entities;
+using Unity.Rendering;
 
 
+public struct GateSpawnDelay : IComponentData
+{
+    public float Value;
+}
 
 
 public class GateAuthoring : MonoBehaviour
@@ -19,11 +24,18 @@ public class GateAuthoring : MonoBehaviour
             {
                 value = authoring.PublicGateNumber
             });
-
-
+            
+            AddComponent(new GateSpawnDelay
+            {
+                Value = 0
+            });
+            AddComponent(new URPMaterialPropertyBaseColor
+            {
+                
+                Value = GateColor.val[authoring.PublicGateNumber]
+            });
         }
     }
-    
-    
 }
+
 

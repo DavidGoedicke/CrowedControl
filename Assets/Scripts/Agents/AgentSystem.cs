@@ -19,18 +19,9 @@ using Unity.Physics.Systems;
 [BurstCompile]
 public partial struct AgentSystem : ISystem
 {
-    public struct BoidJobResults
-    {
-        public float3 avoid;
-        public float3 algin;
-        public float3 group;
-    }
+   
 
 
-    public struct GateJobResults
-    {
-        public float3 Direction;
-    }
 
     public struct WalljobResult
     {
@@ -82,7 +73,7 @@ public partial struct AgentSystem : ISystem
         m_WalkingAgents = state.GetEntityQuery(builder);
 
 
-        Debug.Log("AgentSystem Created");
+        
     }
 
 
@@ -98,8 +89,13 @@ public partial struct AgentSystem : ISystem
             ecb.RemoveComponent<WasBornTag>(entity);
             ecb.AddComponent<WalkingTag>(entity);
             ecb.AddComponent(entity, new WallAvoidVector { Value = float2.zero });
+            ecb.AddComponent(entity,new GateJobResults{Direction = float3.zero});
             ecb.AddComponent(entity,
                 new ApplyImpulse { Direction = math.forward(dir.ValueRO.Value) });
+            ecb.AddComponent(entity, new BoidJobResults());
+            
+            
+            
         }
 
 
@@ -121,8 +117,7 @@ public partial struct AgentSystem : ISystem
 #endif
         NativeArray<Translation> positionMemory = m_WalkingAgents.ToComponentDataArray<Translation>(Allocator.TempJob);
         NativeArray<Rotation> directionMemory = m_WalkingAgents.ToComponentDataArray<Rotation>(Allocator.TempJob);
-        NativeParallelHashMap<Entity, BoidJobResults> boidResults =
-            new NativeParallelHashMap<Entity, BoidJobResults>(agentCount, Allocator.TempJob);
+       
 #if DEBUGMEMEORY
         Debug.Log("Finished memory for Agent system");
 #endif
@@ -131,7 +126,6 @@ public partial struct AgentSystem : ISystem
         {
             positionMemory = positionMemory.AsReadOnly(),
             directionMemory = directionMemory.AsReadOnly(),
-            results = boidResults.AsParallelWriter()
         };
         var boidJobHandle = boidjob.Schedule(state.Dependency);
 #if DEBUGMEMEORY
@@ -143,16 +137,13 @@ public partial struct AgentSystem : ISystem
 #if DEBUGMEMEORY
         Debug.Log("Scheduling Dispose of memoery");
 #endif
-        NativeParallelHashMap<Entity, GateJobResults> gateResult =
-            new NativeParallelHashMap<Entity, GateJobResults>(agentCount, Allocator.TempJob);
-
+      
 #if DEBUGMEMEORY
         Debug.Log("Finished allocation of GateJobresult hasmap");
 #endif
 
         var gateJob = new gateJob()
         {
-            results = gateResult.AsParallelWriter()
         };
         var gateJobHandle = gateJob.Schedule(state.Dependency);
 #if DEBUGMEMEORY
@@ -160,16 +151,13 @@ public partial struct AgentSystem : ISystem
 #endif
         var impulsejob = new impulseApplyJob()
         {
-            GateJobResults = gateResult.AsReadOnly(),
-            BoidJobResult = boidResults.AsReadOnly()
         };
 
         state.Dependency = impulsejob.Schedule(JobHandle.CombineDependencies(boidJobHandle, gateJobHandle));
 #if DEBUGMEMEORY
         Debug.Log("Scheduled Impulse job");
 #endif
-        gateResult.Dispose(state.Dependency);
-        boidResults.Dispose(state.Dependency);
+      
 #if DEBUGMEMEORY
         Debug.Log("Disposing result Arrays");
 #endif
@@ -201,12 +189,11 @@ public partial struct AgentSystem : ISystem
     public partial struct impulseApplyJob : IJobEntity // it might be better to just do this in main thread... 
 
     {
-        public NativeParallelHashMap<Entity, GateJobResults>.ReadOnly GateJobResults;
-        public NativeParallelHashMap<Entity, BoidJobResults>.ReadOnly BoidJobResult;
+       
 
         [BurstCompile]
         public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, ref ApplyImpulse impulse,
-            in WallAvoidVector wav
+            in WallAvoidVector wav, in BoidJobResults bjr, in GateJobResults gjr
 #if DEBUGDIRECT
             , in Translation pos)
 #else
@@ -214,16 +201,11 @@ public partial struct AgentSystem : ISystem
 #endif
         {
             float3 newValue = float3.zero;
-            float3 GateDirection = float3.zero;
-            if (GateJobResults.ContainsKey(entity))
-            {
-                GateDirection = GateJobResults[entity].Direction;
-            }
-
-            newValue = (BoidJobResult[entity].avoid * aviodWeight) +
-                       (BoidJobResult[entity].algin * alignWeight) +
-                       (BoidJobResult[entity].group * groupingWeight) +
-                       (GateDirection * gateWeight);
+            newValue = (bjr.avoid * aviodWeight) +
+                       (bjr.algin * alignWeight) +
+                       (bjr.group * groupingWeight) +
+                       (gjr.Direction * gateWeight);
+            
             if (math.length(wav.Value) > 0)
             {
                 
@@ -235,6 +217,8 @@ public partial struct AgentSystem : ISystem
 #endif
                     newValue += WallAvoidVector * 0.1f;
                     newValue += wav.Value.ExtendTo3() * 0.05f;
+                    
+                    
             }
 
 
@@ -259,18 +243,13 @@ public partial struct AgentSystem : ISystem
     [WithAll(typeof(WalkingTag))]
     [BurstCompile]
     public partial struct gateJob : IJobEntity // it might be better to just do this in main thread... 
-
     {
-        public NativeParallelHashMap<Entity, GateJobResults>.ParallelWriter results;
 
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in Translation pos,
+        public void Execute(ref GateJobResults gjr, in Translation pos,
             in TargetGateEntity TargetPos)
         {
-            results.TryAdd(entity, new GateJobResults()
-            {
-                Direction = (TargetPos.pos - pos.Value)
-            });
+            gjr.Direction = math.normalizesafe(TargetPos.pos - pos.Value);
         }
     }
 
@@ -281,10 +260,9 @@ public partial struct AgentSystem : ISystem
     {
         public NativeArray<Translation>.ReadOnly positionMemory;
         public NativeArray<Rotation>.ReadOnly directionMemory;
-        public NativeParallelHashMap<Entity, BoidJobResults>.ParallelWriter results;
 
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in Translation pos,
+        public void Execute(ref BoidJobResults bjr,[ChunkIndexInQuery] int chunkIndex,in Entity entity, in Translation pos,
             in Rotation dir)
         {
             const float minRaduis = 3f;
@@ -382,17 +360,11 @@ public partial struct AgentSystem : ISystem
             groupingCenter /= groupingCount;
             alignDirection /= alignCount;
             avoidVector /= avoidCount;
-            BoidJobResults tmp = new BoidJobResults()
-                {
-                    avoid = math.normalizesafe(avoidVector),
-                    algin = math.normalizesafe(alignDirection),
-                    group = math.normalizesafe(groupingCenter - pos.Value)
-                }
-                ;
-            if (!results.TryAdd(entity, tmp))
-            {
-                Debug.Log("Failed to add somedata to re reulsts ");
-            }
+
+            bjr.avoid = math.normalizesafe(avoidVector);
+            bjr.algin = math.normalizesafe(alignDirection);
+            bjr.group = math.normalizesafe(groupingCenter - pos.Value);
+
 
 #if DEBUGDIRTEXT
 				Debug.Log(groupingCount.ToString() + " " + alignCount.ToString() + " " + avoidCount.ToString());

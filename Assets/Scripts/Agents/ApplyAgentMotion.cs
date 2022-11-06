@@ -15,7 +15,6 @@ using Unity.Transforms;
 [RequireMatchingQueriesForUpdate]
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateBefore(typeof(PhysicsSystemGroup))]
-
 [BurstCompile]
 public partial struct ApplyAgentMotion : ISystem
 {
@@ -53,14 +52,13 @@ public partial struct ApplyAgentMotion : ISystem
             in AgentConfiguration ac)
         {
             /// Apply a linear impulse to the entity.
-          
+
             if (math.length(_applyImpulseOnKeyData.Direction) <= 0.0f) // if we are alone sometimes there is no directio
             {
-                rigidBodyAspect.ApplyLinearImpulseWorldSpace(math.forward(rigidBodyAspect.Rotation) *DeltaTime  );
+                rigidBodyAspect.ApplyLinearImpulseWorldSpace(math.forward(rigidBodyAspect.Rotation) * DeltaTime);
             }
             else
             {
-
                 rigidBodyAspect.ApplyLinearImpulseWorldSpace(_applyImpulseOnKeyData.Direction * 10 * DeltaTime);
             }
 
@@ -69,12 +67,11 @@ public partial struct ApplyAgentMotion : ISystem
                 float3 temp = rigidBodyAspect.LinearVelocity;
                 temp = math.normalize(temp) * ac.Speed;
                 rigidBodyAspect.LinearVelocity = temp;
-                
             }
-            
-            
-         //  Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString()+" Direction:"+math.length(_applyImpulseOnKeyData.Direction).ToString());
-            var fwd = math.forward( rigidBodyAspect.Rotation);
+
+
+            //  Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString()+" Direction:"+math.length(_applyImpulseOnKeyData.Direction).ToString());
+            var fwd = math.forward(rigidBodyAspect.Rotation);
 
             float2 A = math.normalize(fwd.xz);
             float2 B = math.normalize(_applyImpulseOnKeyData.Direction.xz);
@@ -91,15 +88,25 @@ public partial struct ApplyAgentMotion : ISystem
           //  Debug.DrawRay(rigidBodyAspect.Position, rigidBodyAspect.Right *angleDiff*10, Color.cyan);
             //Debug.Log(math.degrees(angleDiff));
 #endif
+            float rotationSpeed = math.length(rigidBodyAspect.AngularVelocityWorldSpace);
+            
+            if (rotationSpeed > 3f)
+            {
+                rigidBodyAspect.LinearVelocity *= 0.1f;
+                rigidBodyAspect.AngularVelocityWorldSpace*= 0.1f;
+               // Debug.Log("Stopped A unit.. to much spinning");
+            }
+            else
+            {
+                if (angleDiff >= -math.PI / 2 && angleDiff <= math.PI / 2)
+                {
+                    float multiplyer = 0.025f;
 
-          //  if (angleDiff >= -math.PI && angleDiff <= math.PI)
-         //   {
-                float multiplyer = 0.025f;
-                float rotationSpeed = math.length(rigidBodyAspect.AngularVelocityLocalSpace);
 
-                rigidBodyAspect.ApplyAngularImpulseLocalSpace(new float3(0,
-                    angleDiff * math.clamp(rotationSpeed.MapRange(0f, 1f, multiplyer, 0f), multiplyer, 0f), 0));
-         //   }
+                    rigidBodyAspect.ApplyAngularImpulseLocalSpace(new float3(0,
+                        angleDiff * math.clamp(rotationSpeed.MapRange(0f, 1f, multiplyer, 0f), multiplyer, 0f), 0));
+                }
+            }
         }
     }
 }

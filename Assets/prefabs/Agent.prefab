@@ -98,7 +98,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 96fea566210441b4cb47f011243ab830, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 3
+  speed: 5
   SelectTargetGate: 0
   ViewingDistance: 300
 --- !u!114 &8895194622247875018
