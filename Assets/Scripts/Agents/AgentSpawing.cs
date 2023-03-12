@@ -126,7 +126,7 @@ public partial class AgentSpawing : SystemBase
 
                     GateNums targetGate = GateNums.NONE;
                     int attempts = 0;
-                    Debug.Log(gate.value);
+                   //    Debug.Log(gate.value);
                     while (attempts < 100)
                     {
                         var tmp = generator.NextInt(0, _nativeAvalibleTargets.Length);
@@ -167,7 +167,7 @@ public partial class AgentSpawing : SystemBase
                     {
                         Speed = 4,
                         TargetGate = targetGate,
-                        ViewingDistance = 200,
+                        ViewingDistance = 75,
                         ViewingFilter = new CollisionFilter
                         {
                             BelongsTo = 1u << 2,

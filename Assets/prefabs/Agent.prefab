@@ -141,7 +141,7 @@ MonoBehaviour:
   m_MinimumSkinnedVertexWeight: 0.492
   m_ConvexHullGenerationParameters:
     m_SimplificationTolerance: 0.015
-    m_BevelRadius: 0.05
+    m_BevelRadius: 0
     m_MinimumAngle: 2.5000002
   m_CustomMesh: {fileID: 0}
   m_ForceUnique: 0
@@ -159,7 +159,7 @@ MonoBehaviour:
     m_Restitution:
       m_Override: 0
       m_Value:
-        Value: 0
+        Value: 0.013
         CombineMode: 2
     m_BelongsToCategories:
       m_Override: 0
@@ -260,7 +260,7 @@ MonoBehaviour:
   m_Smoothing: 1
   m_Mass: 1
   m_LinearDamping: 0.01
-  m_AngularDamping: 0.05
+  m_AngularDamping: 0.09
   m_InitialLinearVelocity:
     x: 0
     y: 0

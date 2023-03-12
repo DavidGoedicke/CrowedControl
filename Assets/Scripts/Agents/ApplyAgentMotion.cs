@@ -69,7 +69,7 @@ public partial struct ApplyAgentMotion : ISystem
                 rigidBodyAspect.LinearVelocity = temp;
             }
 
-
+            //rigidBodyAspect.
             //  Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString()+" Direction:"+math.length(_applyImpulseOnKeyData.Direction).ToString());
             var fwd = math.forward(rigidBodyAspect.Rotation);
 

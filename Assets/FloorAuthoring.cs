@@ -16,6 +16,7 @@ public struct IsFloorTag : IComponentData
 {
 }
 
+/*
 [DisallowMultipleComponent]
 public class FloorAuthoring : MonoBehaviour
 {
@@ -131,3 +132,4 @@ public partial class FloorVectorManager : SystemBase
 
     private Dictionary<int2, float2> Vectors;
 }
+*/

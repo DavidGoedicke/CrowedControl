@@ -112,9 +112,9 @@ public static class Util
 
 public static class FixedGameValues
 {
-    public static readonly int WallHeight = 4;
-    public static readonly int WallSuperSampling = 2;
-    public static readonly float WallViewSize = 4f;
-    public static readonly float SpawnDelay = 10f;
-    public static readonly int MaxAgents = 200;
+    public static readonly int WallHeight = 3;
+    public static readonly int WallSuperSampling = 1;
+    public static readonly float WallViewSize = 2f;
+    public static readonly float SpawnDelay = 0.25f;
+    public static readonly int MaxAgents = 150;
 }
