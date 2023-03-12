@@ -14,6 +14,7 @@ using Unity.Transforms;
 using UnityEngine;
 using Unity.Physics;
 using Unity.Physics.Systems;
+using UnityEngine.SocialPlatforms;
 
 
 [BurstCompile]
@@ -33,23 +34,20 @@ public partial struct AgentSystem : ISystem
     {
         public ComponentLookup<WalkingTag> c_walkingTagGroup;
         public ComponentLookup<AgentConfiguration> c_agentConfigurationGroup;
-        public ComponentLookup<Translation> c_agentTranslation;
-        public ComponentLookup<Rotation> c_agentRotation;
+        public ComponentLookup<LocalTransform> c_agentLocalTransform;
 
         public ComponentDataHandles(ref SystemState state)
         {
             c_walkingTagGroup = state.GetComponentLookup<WalkingTag>(true);
             c_agentConfigurationGroup = state.GetComponentLookup<AgentConfiguration>(true);
-            c_agentTranslation = state.GetComponentLookup<Translation>(false);
-            c_agentRotation = state.GetComponentLookup<Rotation>(false);
+            c_agentLocalTransform = state.GetComponentLookup<LocalTransform>(false);
         }
 
         public void Update(ref SystemState state)
         {
             c_walkingTagGroup.Update(ref state);
             c_agentConfigurationGroup.Update(ref state);
-            c_agentTranslation.Update(ref state);
-            c_agentRotation.Update(ref state);
+            c_agentLocalTransform.Update(ref state);
         }
     }
 
@@ -69,7 +67,7 @@ public partial struct AgentSystem : ISystem
         var builder = new EntityQueryBuilder(Allocator.Temp);
 
         builder.WithNone<WasBornTag, ArrivedTag>();
-        builder.WithAll<WalkingTag, Translation, Rotation>();
+        builder.WithAll<WalkingTag, LocalTransform>();
         m_WalkingAgents = state.GetEntityQuery(builder);
 
 
@@ -84,14 +82,14 @@ public partial struct AgentSystem : ISystem
         var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
 
-        foreach (var (wbt, dir, entity) in SystemAPI.Query<WasBornTag, RefRO<Rotation>>().WithEntityAccess())
+        foreach (var (wbt, tra, entity) in SystemAPI.Query<WasBornTag, RefRO<LocalTransform>>().WithEntityAccess())
         {
             ecb.RemoveComponent<WasBornTag>(entity);
             ecb.AddComponent<WalkingTag>(entity);
             ecb.AddComponent(entity, new WallAvoidVector { Value = float2.zero });
             ecb.AddComponent(entity,new GateJobResults{Direction = float3.zero});
             ecb.AddComponent(entity,
-                new ApplyImpulse { Direction = math.forward(dir.ValueRO.Value) });
+                new ApplyImpulse { Direction = math.forward(tra.ValueRO.Rotation) });
             ecb.AddComponent(entity, new BoidJobResults());
             
             
@@ -115,8 +113,7 @@ public partial struct AgentSystem : ISystem
 #if DEBUGMEMEORY
         Debug.Log("Will Allocate memory for Agent system");
 #endif
-        NativeArray<Translation> positionMemory = m_WalkingAgents.ToComponentDataArray<Translation>(Allocator.TempJob);
-        NativeArray<Rotation> directionMemory = m_WalkingAgents.ToComponentDataArray<Rotation>(Allocator.TempJob);
+        NativeArray<LocalTransform> localTransformMemory = m_WalkingAgents.ToComponentDataArray<LocalTransform>(Allocator.TempJob);
        
 #if DEBUGMEMEORY
         Debug.Log("Finished memory for Agent system");
@@ -124,15 +121,13 @@ public partial struct AgentSystem : ISystem
         // Schedule the job. Source generation creates and passes the query implicitly.
         var boidjob = new boidJob()
         {
-            positionMemory = positionMemory.AsReadOnly(),
-            directionMemory = directionMemory.AsReadOnly(),
+            transformMemory = localTransformMemory.AsReadOnly(),
         };
         var boidJobHandle = boidjob.Schedule(state.Dependency);
 #if DEBUGMEMEORY
         Debug.Log("Scheduled boid job");
 #endif
-        positionMemory.Dispose(boidJobHandle);
-        directionMemory.Dispose(boidJobHandle);
+        localTransformMemory.Dispose(boidJobHandle);
       
 #if DEBUGMEMEORY
         Debug.Log("Scheduling Dispose of memoery");
@@ -246,10 +241,10 @@ public partial struct AgentSystem : ISystem
     {
 
         [BurstCompile]
-        public void Execute(ref GateJobResults gjr, in Translation pos,
+        public void Execute(ref GateJobResults gjr, in LocalTransform tra,
             in TargetGateEntity TargetPos)
         {
-            gjr.Direction = math.normalizesafe(TargetPos.pos - pos.Value);
+            gjr.Direction = math.normalizesafe(TargetPos.pos - tra.Position);
         }
     }
 
@@ -258,12 +253,11 @@ public partial struct AgentSystem : ISystem
     [BurstCompile]
     public partial struct boidJob : IJobEntity
     {
-        public NativeArray<Translation>.ReadOnly positionMemory;
-        public NativeArray<Rotation>.ReadOnly directionMemory;
+        public NativeArray<LocalTransform>.ReadOnly transformMemory;
+        
 
         [BurstCompile]
-        public void Execute(ref BoidJobResults bjr,[ChunkIndexInQuery] int chunkIndex,in Entity entity, in Translation pos,
-            in Rotation dir)
+        public void Execute(ref BoidJobResults bjr,[ChunkIndexInQuery] int chunkIndex,in Entity entity, in LocalTransform tra)
         {
             const float minRaduis = 3f;
             const float maxAlignRadius = 15f;
@@ -275,9 +269,9 @@ public partial struct AgentSystem : ISystem
             float3 alignDirection = float3.zero;
             uint groupingCount = 0;
             float3 groupingCenter = float3.zero;
-            for (int i = 0; i < positionMemory.Length; i++)
+            for (int i = 0; i < transformMemory.Length; i++)
             {
-                float distance = math.length(pos.Value - positionMemory[i].Value);
+                float distance = math.length(tra.Position - transformMemory[i].Position);
                 if (distance <= 0)
                 {
                     continue;
@@ -286,16 +280,16 @@ public partial struct AgentSystem : ISystem
 
                 #region AreTheyInFronOfMe
 
-                float3 forwardVector = math.rotate(dir.Value, new float3(0f, 0f, 1f));
+                float3 forwardVector = math.rotate(tra.Rotation, new float3(0f, 0f, 1f));
                 bool inFront = AngleDiff(forwardVector,
-                    math.normalizesafe(positionMemory[i].Value - pos.Value));
+                    math.normalizesafe(transformMemory[i].Position - tra.Position));
 
                 #endregion
 
 
                 #region DirectionAllignment
 
-                float3 other_forwardVector = math.rotate(directionMemory[i].Value, new float3(0f, 0f, 1f));
+                float3 other_forwardVector = math.rotate(transformMemory[i].Rotation, new float3(0f, 0f, 1f));
                 bool inLine = AngleDiff(forwardVector, other_forwardVector);
 
                 #endregion
@@ -326,11 +320,11 @@ public partial struct AgentSystem : ISystem
 #endif
                     if (inLine)
                     {
-                        avoidVector += (pos.Value - positionMemory[i].Value) * avoidAdjust;
+                        avoidVector += (tra.Position - transformMemory[i].Position) * avoidAdjust;
                     }
                     else
                     {
-                        avoidVector += pos.Value - positionMemory[i].Value;
+                        avoidVector += tra.Position - transformMemory[i].Position;
                         //if we go into the opposite direction it doesnt matter as much when they come close
                     }
 
@@ -351,7 +345,7 @@ public partial struct AgentSystem : ISystem
                     if (inLine && inFront)
                     {
                         // Only if they go in the same direction do we want to go with them 
-                        groupingCenter += positionMemory[i].Value;
+                        groupingCenter += transformMemory[i].Position;
                         groupingCount++;
                     }
                 }
@@ -363,7 +357,7 @@ public partial struct AgentSystem : ISystem
 
             bjr.avoid = math.normalizesafe(avoidVector);
             bjr.algin = math.normalizesafe(alignDirection);
-            bjr.group = math.normalizesafe(groupingCenter - pos.Value);
+            bjr.group = math.normalizesafe(groupingCenter - tra.Position);
 
 
 #if DEBUGDIRTEXT

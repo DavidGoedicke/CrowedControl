@@ -20,16 +20,16 @@ public partial class AgentSpawing : SystemBase
     {
         public ComponentLookup<ActiveGate> c_ActiveGateGroup;
         public ComponentLookup<AgentConfiguration> c_agentConfigurationGroup;
-        public ComponentLookup<Translation> c_Translate;
-        public ComponentLookup<Rotation> c_Rotate;
+        public ComponentLookup<LocalTransform> c_Translate;
+        
         public ComponentLookup<GateSpawnDelay> c_SpawnDelay;
 
         public ComponentDataHandles(ref SystemState state)
         {
             c_ActiveGateGroup = state.GetComponentLookup<ActiveGate>(true);
             c_agentConfigurationGroup = state.GetComponentLookup<AgentConfiguration>(true);
-            c_Translate = state.GetComponentLookup<Translation>(true);
-            c_Rotate = state.GetComponentLookup<Rotation>(true);
+            c_Translate = state.GetComponentLookup<LocalTransform>(false);
+            
             c_SpawnDelay = state.GetComponentLookup<GateSpawnDelay>(false);
         }
 
@@ -38,7 +38,7 @@ public partial class AgentSpawing : SystemBase
             c_ActiveGateGroup.Update(ref state);
             c_agentConfigurationGroup.Update(ref state);
             c_Translate.Update(ref state);
-            c_Rotate.Update(ref state);
+           
             c_SpawnDelay.Update(ref state);
         }
     }
@@ -53,7 +53,7 @@ public partial class AgentSpawing : SystemBase
         Debug.Log("Created Spawning System");
         var builder = new EntityQueryBuilder(Allocator.Temp);
         builder.WithNone<WasBornTag, ArrivedTag>();
-        builder.WithAll<WalkingTag, Translation, Rotation>();
+        builder.WithAll<WalkingTag, LocalTransform>();
         m_WalkingAgents = GetEntityQuery(builder);
 
         var builder2 = new EntityQueryBuilder(Allocator.Temp);
@@ -117,8 +117,7 @@ public partial class AgentSpawing : SystemBase
             .WithReadOnly(_nativeAvalibleTargets)
             .WithoutBurst()
             .WithName("SpawnMissing")
-            .ForEach((ref GateSpawnDelay spawnDealy, in Entity gateEntity, in ActiveGate gate,
-                in Translation pos, in Rotation rot) =>
+            .ForEach((ref GateSpawnDelay spawnDealy, ref LocalTransform  trans,in Entity gateEntity, in ActiveGate gate) =>
             {
                 if (spawnDealy.Value > FixedGameValues.SpawnDelay)
                 {
@@ -126,7 +125,6 @@ public partial class AgentSpawing : SystemBase
 
                     GateNums targetGate = GateNums.NONE;
                     int attempts = 0;
-                   //    Debug.Log(gate.value);
                     while (attempts < 100)
                     {
                         var tmp = generator.NextInt(0, _nativeAvalibleTargets.Length);
@@ -142,21 +140,23 @@ public partial class AgentSpawing : SystemBase
 
                     var e = ecb.Instantiate(_agentPrefab.Value);
 
-                    quaternion q1 = math.mul(rot.Value,
+                    quaternion q1 = math.mul(trans.Rotation,
                         quaternion.Euler(0, generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
 
 
-                    quaternion q2 = math.mul(rot.Value,
+                    quaternion q2 = math.mul(trans.Rotation,
                         quaternion.Euler(0, generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
 
-                    ecb.SetComponent(e, new Rotation { Value = q1 });
+                    trans.Rotation = q1;
+                    //ecb.SetComponent(e, new Rotation { Value = q1 })
+                      //  ;
 
                     ecb.AddComponent(e, new URPMaterialPropertyBaseColor
                     {
                         Value = GateColor.val[targetGate]
                     });
-
-                    ecb.SetComponent(e, new Translation { Value = (math.forward(q2) * 10) + pos.Value });
+                    trans.Position = (math.forward(q2) * 10) +trans.Position;
+                    //ecb.SetComponent(e, new Translation { Value = (math.forward(q2) * 10) + pos.Value });
                     ecb.AddComponent(e, new StartGateEntity
                     {
                         Value = gateEntity

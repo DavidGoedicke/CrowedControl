@@ -24,11 +24,11 @@ public partial struct AgentRayCast : ISystem
         public EntityCommandBuffer.ParallelWriter Ecb;
 
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in Translation localPosition,
-            in AgentConfiguration agentConfiguration, in Rotation localRotation)
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in LocalTransform localTransform,
+            in AgentConfiguration agentConfiguration)
         {
-            float3 rayStart = localPosition.Value;
-            float3 rayEnd = math.forward(localRotation.Value) * agentConfiguration.ViewingDistance
+            float3 rayStart = localTransform.Position;
+            float3 rayEnd = math.forward(localTransform.Rotation) * agentConfiguration.ViewingDistance
                             + rayStart;
 
 
