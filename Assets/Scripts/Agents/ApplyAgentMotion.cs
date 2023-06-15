@@ -1,4 +1,5 @@
 //#define DEBUGMOTION
+//#define WITHROTATION
 
 using Unity.Burst;
 using Unity.Entities;
@@ -15,7 +16,7 @@ using Unity.Transforms;
 [RequireMatchingQueriesForUpdate]
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 [UpdateBefore(typeof(PhysicsSystemGroup))]
-[BurstCompile]
+//[BurstCompile]
 public partial struct ApplyAgentMotion : ISystem
 {
     [BurstCompile]
@@ -28,14 +29,16 @@ public partial struct ApplyAgentMotion : ISystem
     {
     }
 
-    [BurstCompile]
+   // [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         // TODO(DOTS-6141): This expression can't currently be inlined into the IJobEntity initializer
+        var tmp = GameController.Singelton.SimParams.MotionIsRunning;
         float dt = SystemAPI.Time.DeltaTime;
         state.Dependency = new ApplyAgentImpulseJob
         {
-            DeltaTime = dt,
+            running=tmp,
+            DeltaTime = dt
         }.Schedule(state.Dependency);
     }
 
@@ -44,69 +47,75 @@ public partial struct ApplyAgentMotion : ISystem
     public partial struct ApplyAgentImpulseJob : IJobEntity
     {
         public float DeltaTime;
+        public bool running;
 
         [BurstCompile]
         public void Execute(Entity _entity,
-            ref RigidBodyAspect rigidBodyAspect,
+            RigidBodyAspect rigidBodyAspect,
             in ApplyImpulse _applyImpulseOnKeyData,
             in AgentConfiguration ac)
         {
-            /// Apply a linear impulse to the entity.
-
-            if (math.length(_applyImpulseOnKeyData.Direction) <= 0.0f) // if we are alone sometimes there is no directio
+            if (running)
             {
-                rigidBodyAspect.ApplyLinearImpulseWorldSpace(math.forward(rigidBodyAspect.Rotation) * DeltaTime);
-            }
-            else
-            {
-                rigidBodyAspect.ApplyLinearImpulseWorldSpace(_applyImpulseOnKeyData.Direction * 10 * DeltaTime);
-            }
-
-            if (math.length(rigidBodyAspect.LinearVelocity) > ac.Speed)
-            {
-                float3 temp = rigidBodyAspect.LinearVelocity;
-                temp = math.normalize(temp) * ac.Speed;
-                rigidBodyAspect.LinearVelocity = temp;
-            }
-
-            //rigidBodyAspect.
-            //  Debug.Log("Agent"+_entity.Index.ToString()+ " speed: "+math.length(rigidBodyAspect.LinearVelocity).ToString()+"   "+DeltaTime.ToString()+" Direction:"+math.length(_applyImpulseOnKeyData.Direction).ToString());
-            var fwd = math.forward(rigidBodyAspect.Rotation);
-
-            float2 A = math.normalize(fwd.xz);
-            float2 B = math.normalize(_applyImpulseOnKeyData.Direction.xz);
-
-
-            float dotProduct = math.dot(A, B);
-            float angleDiff = math.acos(dotProduct);
-            angleDiff = (math.cross(fwd, _applyImpulseOnKeyData.Direction)).y < 0 ? -angleDiff : angleDiff;
-
-#if DEBUGMOTION
-            //Debug.Log(math.degrees(angleDiff) + "<=Angle : lanrg =>"+"  DotProduct =>"+A.ToString()+B.ToString()+ _applyImpulseOnKeyData.Direction.x.ToString());
-            Debug.DrawRay(rigidBodyAspect.Position , new Vector3(A.x,0,A.y) , Color.green);
-            Debug.DrawRay(rigidBodyAspect.Position, new Vector3(B.x,0, B.y), Color.red);
-          //  Debug.DrawRay(rigidBodyAspect.Position, rigidBodyAspect.Right *angleDiff*10, Color.cyan);
-            //Debug.Log(math.degrees(angleDiff));
-#endif
-            float rotationSpeed = math.length(rigidBodyAspect.AngularVelocityWorldSpace);
-            
-            if (rotationSpeed > 3f)
-            {
-                rigidBodyAspect.LinearVelocity *= 0.1f;
-                rigidBodyAspect.AngularVelocityWorldSpace*= 0.1f;
-               // Debug.Log("Stopped A unit.. to much spinning");
-            }
-            else
-            {
-                if (angleDiff >= -math.PI / 2 && angleDiff <= math.PI / 2)
+                if (math.length(_applyImpulseOnKeyData.Direction) <=
+                    0.0f) // if we are alone sometimes there is no directio
                 {
-                    float multiplyer = 0.025f;
-
-
-                    rigidBodyAspect.ApplyAngularImpulseLocalSpace(new float3(0,
-                        angleDiff * math.clamp(rotationSpeed.MapRange(0f, 1f, multiplyer, 0f), multiplyer, 0f), 0));
+                    //  Debug.DrawRay(rigidBodyAspect.Position,math.forward(rigidBodyAspect.Rotation)*50,Color.magenta,10);
+                    // rigidBodyAspect.ApplyLinearImpulseWorldSpace(math.forward(rigidBodyAspect.Rotation) * DeltaTime);
                 }
+                else
+                {
+
+                    rigidBodyAspect.ApplyLinearImpulseWorldSpace(_applyImpulseOnKeyData.Direction  * DeltaTime);
+                }
+
+                if (math.length(rigidBodyAspect.LinearVelocity) > ac.Speed)
+                {
+                    float3 temp = rigidBodyAspect.LinearVelocity;
+                    temp = math.normalize(temp) * ac.Speed;
+                    rigidBodyAspect.LinearVelocity = temp;
+                }
+
+/*
+
+                float dotProduct = math.dot(math.normalize(rigidBodyAspect.WorldFromBody.Forward().xz),
+                    math.normalize(rigidBodyAspect.LinearVelocity.xz));
+                float angleDiff = math.acos(dotProduct);
+                angleDiff = math.cross(rigidBodyAspect.WorldFromBody.Forward(), rigidBodyAspect.LinearVelocity).y < 0
+                    ? -angleDiff
+                    : angleDiff;
+                Debug.Log(angleDiff);
+                //rigidBodyAspect.Apply
+                // rigidBodyAspect.WorldFromBody.RotateY(angleDiff);
+                // rigidBodyAspect.Rotation = math.mul(rigidBodyAspect.Rotation,
+                //      quaternion.AxisAngle(new float3(0, 1, 0), angleDiff));
+                if (!math.isnan(angleDiff))
+                {
+                    if (rigidBodyAspect.AngularVelocityWorldSpace.y > 0 && angleDiff < 0)
+                    {
+                        rigidBodyAspect.ApplyAngularImpulseWorldSpace(new float3(0, -0.5f, 0));
+                    }
+
+
+                    else if (rigidBodyAspect.AngularVelocityWorldSpace.y < 0 && angleDiff > 0)
+                    {
+
+                        rigidBodyAspect.ApplyAngularImpulseWorldSpace(new float3(0, 0.5f, 0));
+                    }
+                }
+                */
             }
+
+
+
+
+    
+            else
+            {
+               
+                rigidBodyAspect.LinearVelocity=float3.zero;
+            }
+
         }
     }
 }

@@ -70,6 +70,7 @@ public partial class AgentSpawing : SystemBase
 
     protected override void OnUpdate()
     {
+        
         //  m_Handles.Update(ref state);
         float deltaTime = SystemAPI.Time.DeltaTime;
         Entities
@@ -77,11 +78,11 @@ public partial class AgentSpawing : SystemBase
             .WithAll<ActiveGate>()
             .ForEach((ref GateSpawnDelay gsDelay) => { gsDelay.Value += deltaTime; }).ScheduleParallel();
 
-        Debug.Log("just updated time for the gates respawn");
+       // Debug.Log("just updated time for the gates respawn");
         int agentCount = m_WalkingAgents.CalculateEntityCount();
         int gateCount = m_ActiveGatesCount.CalculateEntityCount();
         var _agentPrefab = SystemAPI.GetSingleton<AgentPrefab>();
-        int targetAgentCount = FixedGameValues.MaxAgents;
+        int targetAgentCount = SimVal.MaxAgents;
 
         int diff = targetAgentCount - agentCount;
 
@@ -106,8 +107,6 @@ public partial class AgentSpawing : SystemBase
                     avalibleTargets.Add(AG.value);
                 }
             }).Run();
-
-        //Debug.Log("Needtospawn: " + diff);
         
 
         NativeArray<GateNums> _nativeAvalibleTargets =
@@ -117,9 +116,9 @@ public partial class AgentSpawing : SystemBase
             .WithReadOnly(_nativeAvalibleTargets)
             .WithoutBurst()
             .WithName("SpawnMissing")
-            .ForEach((ref GateSpawnDelay spawnDealy, ref LocalTransform  trans,in Entity gateEntity, in ActiveGate gate) =>
+            .ForEach((ref GateSpawnDelay spawnDealy, in LocalTransform  trans,in Entity gateEntity, in ActiveGate gate) =>
             {
-                if (spawnDealy.Value > FixedGameValues.SpawnDelay)
+                if (spawnDealy.Value > SimVal.SpawnDelay)
                 {
                     spawnDealy.Value = 0;
 
@@ -146,17 +145,22 @@ public partial class AgentSpawing : SystemBase
 
                     quaternion q2 = math.mul(trans.Rotation,
                         quaternion.Euler(0, generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
-
-                    trans.Rotation = q1;
-                    //ecb.SetComponent(e, new Rotation { Value = q1 })
-                      //  ;
+                   
 
                     ecb.AddComponent(e, new URPMaterialPropertyBaseColor
                     {
                         Value = GateColor.val[targetGate]
                     });
-                    trans.Position = (math.forward(q2) * 10) +trans.Position;
-                    //ecb.SetComponent(e, new Translation { Value = (math.forward(q2) * 10) + pos.Value });
+
+                   float3 tempPos=  (math.forward(q2) * 10) + trans.Position + new float3(0, 1, 0);
+                   
+                   Debug.Log("Spawing at:"+tempPos);
+                    ecb.SetComponent(e, new LocalTransform
+                    {
+                        Position = tempPos,
+                        Rotation = q1
+                    });
+                    
                     ecb.AddComponent(e, new StartGateEntity
                     {
                         Value = gateEntity
@@ -168,13 +172,9 @@ public partial class AgentSpawing : SystemBase
                         Speed = 4,
                         TargetGate = targetGate,
                         ViewingDistance = 75,
-                        ViewingFilter = new CollisionFilter
-                        {
-                            BelongsTo = 1u << 2,
-                            CollidesWith = 3u,
-                            GroupIndex = 0
-                        }
+                        ViewingFilter = AgentAuthoring.ViewingFilter
                     });
+                    Debug.Break();
                 }
             }).Run();
     }

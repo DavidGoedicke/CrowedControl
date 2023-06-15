@@ -61,6 +61,34 @@ public struct GateColor
 }
 
 
+public enum DbgTpe : byte
+{
+    Avoid,
+    Align,
+    Group,
+    Avoid_OPP,
+    Align_OPP,
+    Group_OPP,
+    SELF,
+    NONE
+}
+public struct DbgLin
+{
+    public static readonly Dictionary<DbgTpe, float3> col =
+        new Dictionary<DbgTpe, float3>
+        {
+            { DbgTpe.Avoid, new float3(1f, 0f, 0f )},
+            { DbgTpe.Align, new float3(0f, 1f, 0f) },
+            { DbgTpe.Group, new float3(0f, 0f, 1f) },
+            { DbgTpe.Avoid_OPP, new float3(.7f, 0.1f, 0.1f) },
+            { DbgTpe.Align_OPP, new float3(.1f, .7f, 0.1f) },
+            { DbgTpe.Group_OPP, new float3(0.1f, 0.1f, .7f) },
+            { DbgTpe.SELF, new float3(.8f, .8f, .8f) },
+            { DbgTpe.NONE, new float3(.3f, .3f, 0.3f) }
+        };
+}
+
+
 //Agent:
 //What the agent wants to go to;
 
@@ -89,6 +117,9 @@ public struct ActiveSign : IComponentData
 }
 
 
+
+
+
 public static class Util
 {
     public static float3 ExtendTo3(this float2 x)
@@ -107,14 +138,9 @@ public static class Util
     {
         return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
     }
+    
+    
+    
 }
 
 
-public static class FixedGameValues
-{
-    public static readonly int WallHeight = 3;
-    public static readonly int WallSuperSampling = 1;
-    public static readonly float WallViewSize = 2f;
-    public static readonly float SpawnDelay = 0.25f;
-    public static readonly int MaxAgents = 150;
-}

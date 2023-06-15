@@ -1,11 +1,14 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Entities;
+using Unity.Entities.Hybrid.Baking;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Physics.Systems;
 using Unity.Physics.Authoring;
+using Random = Unity.Mathematics.Random;
 
 
 public struct WallAvoidVector : IComponentData
@@ -43,6 +46,10 @@ public struct BoidJobResults: IComponentData
     public float3 avoid;
     public float3 algin;
     public float3 group;
+    
+    public float3 avoid_OPP;
+    public float3 algin_OPP;
+    public float3 group_OPP;
    
 }
 public struct GateJobResults: IComponentData
@@ -58,43 +65,60 @@ public struct AgentConfiguration : IComponentData
     public GateNums TargetGate;
     public float ViewingDistance;
     public CollisionFilter ViewingFilter;
+    public float Lazyness;
+}
+
+public struct AgentLazyness :  IComponentData
+{
+    public float currentLazyness;
+    public bool active;
 }
 
 
-[RequireComponent(typeof(PhysicsShapeAuthoring))]
-[RequireComponent(typeof(PhysicsBodyAuthoring))]
 public class AgentAuthoring : MonoBehaviour
 {
+
+    public static float MaxGroupingRadius = 10f;
     [Header("Agent MaxSpeed")]
     // Fields are used to populate Entity data
     public float speed = 3.0f;
 
     [Header("Agent Target Gate")] public GateNums SelectTargetGate = GateNums.A;
 
-    [Header("Viewing Distance")] public float ViewingDistance = 300;
+    [Header("Viewing Distance")] public float ViewingDistance = 600;
 
-    public CollisionFilter ViewingFilter = new CollisionFilter
+    [Header("TimeBetweenUpdates")] public float Lazyness = 0.1f;
+    public static CollisionFilter ViewingFilter = new CollisionFilter
     {
-        BelongsTo = 1u << 2,
+        BelongsTo = 1u <<2,
         CollidesWith = 3u,
         GroupIndex = 0
     }; // TODO: This is by handAnd should be selected or automated
 
-    public class Baker : Baker<AgentAuthoring>
+    public class AgentBaker : Baker<AgentAuthoring>
     {
+        Random rand =  Random.CreateFromIndex(0);
         public override void Bake(AgentAuthoring m)
         {
-            Debug.Log("Bake one unit");
+           // Debug.Log("Bake one unit");
             // This simple baker adds just one component to the entity.
             AddComponent(new AgentConfiguration
             {
                 Speed = m.speed,
                 TargetGate = m.SelectTargetGate,
                 ViewingDistance = m.ViewingDistance,
-                ViewingFilter = m.ViewingFilter
+                ViewingFilter = ViewingFilter,
+                Lazyness = m.Lazyness +rand.NextFloat(-0.1f,0.1f)
             });
-
+            
             AddComponent(new WasBornTag());
+            AddComponent(new AgentLazyness{currentLazyness= 0});
         }
     }
+
+   
+    
+
+    
+    
 }

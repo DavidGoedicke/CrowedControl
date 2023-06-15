@@ -7,6 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 using Unity.Physics;
+using Unity.Physics.Aspects;
 using Unity.Physics.Systems;
 using UnityEngine;
 
@@ -24,11 +25,13 @@ public partial struct AgentRayCast : ISystem
         public EntityCommandBuffer.ParallelWriter Ecb;
 
         [BurstCompile]
-        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity, in LocalTransform localTransform,
+        public void Execute([ChunkIndexInQuery] int chunkIndex, Entity entity,   RigidBodyAspect vel,
             in AgentConfiguration agentConfiguration)
         {
-            float3 rayStart = localTransform.Position;
-            float3 rayEnd = math.forward(localTransform.Rotation) * agentConfiguration.ViewingDistance
+            float3 forward = math.normalizesafe(vel.LinearVelocity);
+
+            float3 rayStart = vel.Position;
+            float3 rayEnd = forward * agentConfiguration.ViewingDistance
                             + rayStart;
 
 
@@ -49,6 +52,7 @@ public partial struct AgentRayCast : ISystem
 
             if (hit)
             {
+             //   Debug.Log("Got a Hit");
                 if (SignAndGateMemory.ContainsKey(rayResult.Entity))
                 {
 #if DEBUGRAY
@@ -63,7 +67,7 @@ public partial struct AgentRayCast : ISystem
                 else
                 {
 #if DEBUGRAY
-                            Debug.DrawRay(rayStart + (math.forward(localRotation.Value) * agentConfiguration.ViewingDistance) * rayResult.Fraction, Vector3.up, Color.red, 5f);
+                Debug.DrawRay(rayStart + (forward* agentConfiguration.ViewingDistance) * rayResult.Fraction, Vector3.up, Color.red, 5f);
 #endif
                 }
             }
