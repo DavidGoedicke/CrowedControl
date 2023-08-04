@@ -66,12 +66,12 @@ public partial struct AgentSystem : ISystem
     }
 
 
-    //[BurstCompile]
+    [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
         float deltaTime = SystemAPI.Time.DeltaTime;
 
-/*
+
         m_Handles.Update(ref state);
         var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
         var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
@@ -86,7 +86,7 @@ public partial struct AgentSystem : ISystem
                 new ApplyImpulse {Direction = tra.ValueRO.Forward()*0.01f});
             ecb.AddComponent(entity, new BoidJobResults());
         }
-*/
+
 
         int agentCount = m_WalkingAgents.CalculateEntityCount();
 

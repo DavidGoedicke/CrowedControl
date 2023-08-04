@@ -174,6 +174,11 @@ public partial class AgentSpawing : SystemBase
                         ViewingDistance = 75,
                         ViewingFilter = AgentAuthoring.ViewingFilter
                     });
+                    
+                    
+                    
+                    
+                    
                     Debug.Break();
                 }
             }).Run();

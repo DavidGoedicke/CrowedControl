@@ -102,7 +102,8 @@ public class AgentAuthoring : MonoBehaviour
         {
            // Debug.Log("Bake one unit");
             // This simple baker adds just one component to the entity.
-            AddComponent(new AgentConfiguration
+            Entity entity = GetEntity(m, TransformUsageFlags.Dynamic);
+            AddComponent(entity,new AgentConfiguration
             {
                 Speed = m.speed,
                 TargetGate = m.SelectTargetGate,
@@ -111,11 +112,11 @@ public class AgentAuthoring : MonoBehaviour
                 Lazyness = m.Lazyness +rand.NextFloat(-0.1f,0.1f)
             });
             
-            AddComponent(new WasBornTag());
-            AddComponent(new AgentLazyness{currentLazyness= 0});
+            AddComponent(entity,new WasBornTag());
+            AddComponent(entity,new AgentLazyness{currentLazyness= 0});
         }
     }
-
+     
    
     
 

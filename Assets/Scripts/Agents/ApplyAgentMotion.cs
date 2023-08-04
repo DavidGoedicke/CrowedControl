@@ -65,8 +65,17 @@ public partial struct ApplyAgentMotion : ISystem
                 }
                 else
                 {
-
-                    rigidBodyAspect.ApplyLinearImpulseWorldSpace(_applyImpulseOnKeyData.Direction  * DeltaTime);
+                    
+                    if (! math.isnan(_applyImpulseOnKeyData.Direction.x) && 
+                        ! math.isnan(_applyImpulseOnKeyData.Direction.y) &&
+                        ! math.isnan(_applyImpulseOnKeyData.Direction.z) )
+                    {
+                         rigidBodyAspect.ApplyLinearImpulseWorldSpace(_applyImpulseOnKeyData.Direction  * DeltaTime);
+                    }
+                    else
+                    {
+                        
+                    }
                 }
 
                 if (math.length(rigidBodyAspect.LinearVelocity) > ac.Speed)
