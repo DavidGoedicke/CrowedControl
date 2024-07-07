@@ -20,6 +20,7 @@ using Unity.Physics.Aspects;
 
 
 [BurstCompile]
+[UpdateBefore(typeof(FixedStepSimulationSystemGroup))]
 public partial struct AgentSystem : ISystem
 {
     public struct WalljobResult
@@ -60,7 +61,7 @@ public partial struct AgentSystem : ISystem
 
         var builder = new EntityQueryBuilder(Allocator.Temp);
 
-        builder.WithNone<WasBornTag, ArrivedTag>();
+        builder.WithNone<ReadyToSpawn, ArrivedTag>();
         builder.WithAll<PhysicsVelocity, LocalTransform, WalkingTag>();
         m_WalkingAgents = state.GetEntityQuery(builder);
     }
@@ -73,20 +74,7 @@ public partial struct AgentSystem : ISystem
 
 
         m_Handles.Update(ref state);
-        var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
-        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged);
-
-        foreach (var (wbt, tra, entity) in SystemAPI.Query<WasBornTag, RefRO<LocalTransform>>().WithEntityAccess())
-        {
-            ecb.RemoveComponent<WasBornTag>(entity);
-            ecb.AddComponent<WalkingTag>(entity);
-            ecb.AddComponent(entity, new WallAvoidVector {Value = float2.zero});
-            ecb.AddComponent(entity, new GateJobResults {Direction = float3.zero});
-            ecb.AddComponent(entity,
-                new ApplyImpulse {Direction = tra.ValueRO.Forward()*0.01f});
-            ecb.AddComponent(entity, new BoidJobResults());
-        }
-
+        
 
         int agentCount = m_WalkingAgents.CalculateEntityCount();
 
@@ -257,7 +245,7 @@ public partial struct AgentSystem : ISystem
                 newValue += wav.Value.ExtendTo3() * 0.05f;
             }
 
-            impulse.Direction = newValue;
+            impulse.Direction = new float3(1,0,0);
         }
     }
 

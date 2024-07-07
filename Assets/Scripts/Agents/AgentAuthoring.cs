@@ -16,9 +16,7 @@ public struct WallAvoidVector : IComponentData
     public float2 Value;
 }
 
-public struct WasBornTag : IComponentData
-{
-}
+public struct ReadyToSpawn : IComponentData { }
 
 public struct WalkingTag : IComponentData
 {
@@ -95,6 +93,8 @@ public class AgentAuthoring : MonoBehaviour
         GroupIndex = 0
     }; // TODO: This is by handAnd should be selected or automated
 
+    
+    
     public class AgentBaker : Baker<AgentAuthoring>
     {
         Random rand =  Random.CreateFromIndex(0);
@@ -103,6 +103,7 @@ public class AgentAuthoring : MonoBehaviour
            // Debug.Log("Bake one unit");
             // This simple baker adds just one component to the entity.
             Entity entity = GetEntity(m, TransformUsageFlags.Dynamic);
+            
             AddComponent(entity,new AgentConfiguration
             {
                 Speed = m.speed,
@@ -111,15 +112,7 @@ public class AgentAuthoring : MonoBehaviour
                 ViewingFilter = ViewingFilter,
                 Lazyness = m.Lazyness +rand.NextFloat(-0.1f,0.1f)
             });
-            
-            AddComponent(entity,new WasBornTag());
-            AddComponent(entity,new AgentLazyness{currentLazyness= 0});
+           
         }
     }
-     
-   
-    
-
-    
-    
 }
