@@ -13,7 +13,7 @@ using Unity.Transforms;
 using Random = Unity.Mathematics.Random;
 
 
-[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+[UpdateBefore(typeof(AgentSystem))]
 public partial class AgentSpawing : SystemBase
 {
     struct ComponentDataHandles
@@ -21,7 +21,6 @@ public partial class AgentSpawing : SystemBase
         public ComponentLookup<ActiveGate> c_ActiveGateGroup;
         public ComponentLookup<AgentConfiguration> c_agentConfigurationGroup;
         public ComponentLookup<LocalTransform> c_Translate;
-        
         public ComponentLookup<GateSpawnDelay> c_SpawnDelay;
 
         public ComponentDataHandles(ref SystemState state)
@@ -52,7 +51,7 @@ public partial class AgentSpawing : SystemBase
     {
         Debug.Log("Created Spawning System");
         var builder = new EntityQueryBuilder(Allocator.Temp);
-        builder.WithNone<WasBornTag, ArrivedTag>();
+        builder.WithNone<ReadyToSpawn, ArrivedTag>();
         builder.WithAll<WalkingTag, LocalTransform>();
         m_WalkingAgents = GetEntityQuery(builder);
 
@@ -62,18 +61,20 @@ public partial class AgentSpawing : SystemBase
 
         m_ActiveGatesCount = GetEntityQuery(builder2);
         generator = new Random((uint)DateTime.Now.Second);
+        RequireForUpdate<AgentPrefab>();
     }
 
     protected override void OnDestroy()
     {
     }
 
-    protected override void OnUpdate()
-    {
+    protected override void OnUpdate() {
+
         
         //  m_Handles.Update(ref state);
         float deltaTime = SystemAPI.Time.DeltaTime;
         Entities
+            
             .WithName("UpdateGateTime")
             .WithAll<ActiveGate>()
             .ForEach((ref GateSpawnDelay gsDelay) => { gsDelay.Value += deltaTime; }).ScheduleParallel();
@@ -136,8 +137,15 @@ public partial class AgentSpawing : SystemBase
                         attempts++;
                     }
 
-
                     var e = ecb.Instantiate(_agentPrefab.Value);
+                    
+                    ecb.AddComponent(e, new AgentConfiguration
+                    {
+                        Speed = 4,
+                        TargetGate = targetGate,
+                        ViewingDistance = 75,
+                        ViewingFilter = AgentAuthoring.ViewingFilter
+                    });
 
                     quaternion q1 = math.mul(trans.Rotation,
                         quaternion.Euler(0, generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
@@ -145,16 +153,10 @@ public partial class AgentSpawing : SystemBase
 
                     quaternion q2 = math.mul(trans.Rotation,
                         quaternion.Euler(0, generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
-                   
 
-                    ecb.AddComponent(e, new URPMaterialPropertyBaseColor
-                    {
-                        Value = GateColor.val[targetGate]
-                    });
-
-                   float3 tempPos=  (math.forward(q2) * 10) + trans.Position + new float3(0, 1, 0);
+                    float3 tempPos=  (math.forward(q2) * 10) + trans.Position + new float3(0, 2, 0);
                    
-                   Debug.Log("Spawing at:"+tempPos);
+                    Debug.Log("Spawing at:"+tempPos);
                     ecb.SetComponent(e, new LocalTransform
                     {
                         Position = tempPos,
@@ -165,22 +167,61 @@ public partial class AgentSpawing : SystemBase
                     {
                         Value = gateEntity
                     });
-                    ecb.AddComponent<WasBornTag>(e);
-
-                    ecb.AddComponent(e, new AgentConfiguration
-                    {
-                        Speed = 4,
-                        TargetGate = targetGate,
-                        ViewingDistance = 75,
-                        ViewingFilter = AgentAuthoring.ViewingFilter
-                    });
                     
-                    
-                    
-                    
-                    
-                    Debug.Break();
+                    InitAgent(ref ecb, e);
                 }
             }).Run();
+        
+        Entities
+            .WithoutBurst()
+            .WithName("UpdatedSpanwed")
+            .WithAll<ReadyToSpawn>()
+            .ForEach(ref Entity e) =>
+        {
+            // add all the reuqired components including physics objects.  the idea is that any agent needs to go through this.
+        }
+
+
+        private static void InitAgent(ref EntityCommandBuffer ecb, Entity e) {
+        
+                   ecb.AddComponent<WalkingTag>(e);
+                   ecb.AddComponent(e, new WallAvoidVector {Value = float2.zero});
+                   ecb.AddComponent(e, new GateJobResults {Direction = float3.zero});
+                   ecb.AddComponent(e, new ApplyImpulse {Direction =new float3(1,0,1)});// tra.ValueRO.Forward()
+                   ecb.AddComponent(e, new BoidJobResults());
+                   ecb.AddComponent(e,new AgentLazyness{currentLazyness= 0});
+                    
+                    
+                   
+                    ecb.AddComponent(e, new URPMaterialPropertyBaseColor
+                    {
+                        Value = GateColor.val[targetGate]
+                    });
+
+                  
+                   
+                  
+                    
+                    // Ensure that PhysicsMass and PhysicsVelocity components are properly initialized
+                    ecb.SetComponent(e, new PhysicsMass
+                    {
+                        InverseMass = 1.0f,
+                        InverseInertia = new float3(1, 1, 1) // Ensure proper inertia values
+                        
+                    });
+                    
+                    ecb.SetComponent(e, new PhysicsVelocity
+                    {
+                        Linear = float3.zero,
+                        Angular = float3.zero
+                        
+                    });
+                    
+                    ecb.SetComponent(e, new PhysicsDamping
+                    {
+                        Linear = 0.01f,
+                        Angular = 0.05f
+                        
+                    });
     }
 }
