@@ -46,14 +46,14 @@ public partial struct ApplyAgentMotion : ISystem {
             RigidBodyAspect rigidBodyAspect,
             in ApplyImpulse _applyImpulseOnKeyData,
             in AgentConfiguration ac) {
-            Debug.Log("Befor: " + rigidBodyAspect.LinearVelocity+"Time:"+DeltaTime );
+            //Debug.Log("Befor: " + rigidBodyAspect.LinearVelocity+"Time:"+DeltaTime );
 
         if (math.length(_applyImpulseOnKeyData.Direction) > 0.0f) {
                 // rigidBodyAspect.ApplyLinearImpulseWorldSpace(math.normalizesafe(_applyImpulseOnKeyData.Direction) * DeltaTime);
-                Debug.Log(rigidBodyAspect.Mass);
+               // Debug.Log(rigidBodyAspect.Mass);
                 rigidBodyAspect.ApplyLinearImpulseWorldSpace(new float3(0.00000001f, 0, 0));
             }
-            Debug.Log("After: "+rigidBodyAspect.LinearVelocity);
+            //Debug.Log("After: "+rigidBodyAspect.LinearVelocity);
         }
     }
 }

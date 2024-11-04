@@ -9,7 +9,17 @@ public class SpawingArchetypeAuthoring : MonoBehaviour
     {
         public override void Bake(SpawingArchetypeAuthoring authoring)
         {
+            //var prefabEntity = GetEntity(authoring.AgentPrefab);
+            
             AddComponent(new AgentPrefab { Value = GetEntity(authoring.AgentPrefab) });
+            
+            // Add singleton to reference the prefab
+         //   AddComponent(new AgentPrefab { Value = prefabEntity });
+
+            // Add components for the archetype behavior
+           
+           
+           
         }
     }
 }

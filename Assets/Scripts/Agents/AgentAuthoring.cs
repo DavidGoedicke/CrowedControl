@@ -3,12 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Unity.Entities;
-using Unity.Entities.Hybrid.Baking;
 using Unity.Mathematics;
 using Unity.Physics;
-using Unity.Physics.Systems;
-using Unity.Physics.Authoring;
 using Random = Unity.Mathematics.Random;
+using Unity.Rendering;
+using Unity.Transforms;
 
 
 public struct WallAvoidVector : IComponentData
@@ -114,5 +113,31 @@ public class AgentAuthoring : MonoBehaviour
             });
            
         }
+    }
+}
+
+
+public static class AgentArchetypeManager
+{
+    public static EntityArchetype AgentArchetype;
+
+    // Initialize the archetype in a static method
+    public static void InitializeArchetype(EntityManager entityManager)
+    {
+        AgentArchetype = entityManager.CreateArchetype(
+            typeof(LocalTransform),
+            typeof(WalkingTag),
+            typeof(WallAvoidVector),
+            typeof(GateJobResults),
+            typeof(ApplyImpulse),
+            typeof(BoidJobResults),
+            typeof(AgentLazyness),
+            typeof(URPMaterialPropertyBaseColor),
+            typeof(PhysicsMass),
+            typeof(PhysicsVelocity),
+            typeof(PhysicsDamping),
+            typeof(StartGateEntity),
+            typeof(AgentConfiguration)
+        );
     }
 }

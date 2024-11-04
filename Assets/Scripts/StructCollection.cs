@@ -3,8 +3,6 @@
 using Unity.Entities;
 using Unity.Mathematics;
 using System.Collections.Generic;
-using Unity.Collections;
-using UnityEngine;
 
 
 //General:
