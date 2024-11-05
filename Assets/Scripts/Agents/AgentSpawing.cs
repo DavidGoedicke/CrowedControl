@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+
 #if USERBURST
 using Unity.Burst;
 #endif
@@ -14,21 +15,28 @@ using Unity.Rendering;
 using Unity.Transforms;
 using Random = Unity.Mathematics.Random;
 using UnityEditor;
+using CapsuleCollider = Unity.Physics.CapsuleCollider;
+using Collider = Unity.Physics.Collider;
 using Material = UnityEngine.Material;
 
 
 [UpdateBefore(typeof(AgentSystem))]
-public partial class AgentSpawing : SystemBase {
-    public Texture2D AgentSprite;
-    
+public partial class AgentSpawing : SystemBase
+{
+
+
     private EntityQuery m_WalkingAgents;
     private EntityQuery m_ActiveGatesCount;
     private Random generator;
-    protected override void OnCreate() {
+    
+    private RenderMeshDescription renderMeshDescription;
+    private RenderMeshArray renderMeshArray;
+
+    protected override void OnCreate()
+    {
         Debug.Log("Created Spawning System");
-        
+
         AgentArchetypeManager.InitializeArchetype(EntityManager);
-        
 
 
         var builder = new EntityQueryBuilder(Allocator.Temp);
@@ -43,78 +51,186 @@ public partial class AgentSpawing : SystemBase {
         generator = new Random((uint)DateTime.UtcNow.Millisecond);
         RequireForUpdate<AgentPrefab>();
         Debug.Log("AgentSpawning has started!");
-      
+        
+     Texture2D AgentSprite = Resources.Load<Texture2D>("Textures/AgentSprite"); // Loads from Assets/Resources/AgentSprite.png
 
-       
+        if (AgentSprite == null)
+        {
+            Debug.LogError("Sprite not found in Resources folder!");
+            return;
+        }
+
+        var quadMesh = Resources.Load<Mesh>("Quad"); // Ensure this exists in Assets/Resources/QuadMesh.asset
+        if (quadMesh == null)
+        {
+            Debug.LogError("Quad mesh not found in Resources folder!");
+            return;
+        }
+        renderMeshDescription = new RenderMeshDescription(
+            shadowCastingMode: UnityEngine.Rendering.ShadowCastingMode.Off,
+            receiveShadows: false);
+
+        var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        material.mainTexture = AgentSprite;
+        material.SetFloat("_Surface", 0.5f); // 1 = Transparent, 0 = Opaque
+        material.SetFloat("_AlphaClip", 0.5f); // Enables alpha clipping
+        material.color = Color.white; // Ensure it’s a visible color
+        
+        Debug.Log($"check the mesh {quadMesh} : {quadMesh.vertexCount}");
+        // Create a RenderMeshArray
+        renderMeshArray = new RenderMeshArray(new[] { material }, new Mesh[] { quadMesh },
+            new MaterialMeshIndex[]
+                { new MaterialMeshIndex() { MaterialIndex = 0, MeshIndex = 0, SubMeshIndex = 0 } });
+        
+        
     }
 
-    protected override void OnDestroy() {
+    protected override void OnDestroy()
+    {
     }
 #if USERBURST
     [BurstCompile]
 #endif
-    public partial struct UpdateGateTimeJob : IJobEntity {
+    public partial struct UpdateGateTimeJob : IJobEntity
+    {
         public float DeltaTime;
 
-        public void Execute(ref GateSpawnDelay gsDelay) {
+        public void Execute(ref GateSpawnDelay gsDelay)
+        {
             gsDelay.Value += DeltaTime;
         }
     }
 
-   /*
-#if USERBURST
-    [BurstCompile]
-#endif
-    public partial struct SpawnAgentJob : IJobEntity {
-        public EntityCommandBuffer ECB;
-        public Entity AgentPrefab;
-        public float DeltaTime;
-        public GateNums[] AvailableTargets;
-        public Random Generator;
+    /*
+ #if USERBURST
+     [BurstCompile]
+ #endif
+     public partial struct SpawnAgentJob : IJobEntity {
+         public EntityCommandBuffer ECB;
+         public Entity AgentPrefab;
+         public float DeltaTime;
+         public GateNums[] AvailableTargets;
+         public Random Generator;
 
-        public void Execute(ref GateSpawnDelay spawnDelay, in LocalTransform trans, in Entity gateEntity,
-            in ActiveGate gate) {
-            if (spawnDelay.Value > SimVal.SpawnDelay) {
-                spawnDelay.Value = 0;
+         public void Execute(ref GateSpawnDelay spawnDelay, in LocalTransform trans, in Entity gateEntity,
+             in ActiveGate gate) {
+             if (spawnDelay.Value > SimVal.SpawnDelay) {
+                 spawnDelay.Value = 0;
 
-                // Select a target gate
-                GateNums targetGate = AvailableTargets[Generator.NextInt(AvailableTargets.Length)];
+                 // Select a target gate
+                 GateNums targetGate = AvailableTargets[Generator.NextInt(AvailableTargets.Length)];
 
-                // Create and set up the agent entity
-                var e = ECB.Instantiate(AgentPrefab);
-                
+                 // Create and set up the agent entity
+                 var e = ECB.Instantiate(AgentPrefab);
 
-                // Randomize position and rotation
-                quaternion randomRotation = math.mul(trans.Rotation, quaternion.Euler(0, Generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
-                float3 spawnPosition = (math.forward(randomRotation) * 10) + trans.Position + new float3(0, 2, 0);
 
-                // Apply components
-                ECB.SetComponent(e, new LocalTransform { Position = spawnPosition, Rotation = randomRotation });
-                ECB.AddComponent(e, new StartGateEntity { Value = gateEntity });
-                ECB.AddComponent(e, new AgentConfiguration
-                {
-                    Speed = 4,
-                    TargetGate = targetGate,
-                    ViewingDistance = 75,
-                    ViewingFilter = AgentAuthoring.ViewingFilter
-                });
-                ECB.AddComponent(e, new WallAvoidVector { Value = float2.zero });
-                ECB.AddComponent(e, new ApplyImpulse { Direction = new float3(1, 0, 1) });
-                ECB.AddComponent(e, new URPMaterialPropertyBaseColor { Value = new float4(1, 0, 0, 1) });  // Set color as desired
+                 // Randomize position and rotation
+                 quaternion randomRotation = math.mul(trans.Rotation, quaternion.Euler(0, Generator.NextFloat(-math.PI / 4, math.PI / 4), 0));
+                 float3 spawnPosition = (math.forward(randomRotation) * 10) + trans.Position + new float3(0, 2, 0);
 
-                // Initialize physics components
-                ECB.SetComponent(e, new PhysicsMass { InverseMass = 1.0f, InverseInertia = new float3(1, 1, 1) });
-                ECB.SetComponent(e, new PhysicsVelocity { Linear = float3.zero, Angular = float3.zero });
-                ECB.SetComponent(e, new PhysicsDamping { Linear = 0.01f, Angular = 0.05f });
-            }
+                 // Apply components
+                 ECB.SetComponent(e, new LocalTransform { Position = spawnPosition, Rotation = randomRotation });
+                 ECB.AddComponent(e, new StartGateEntity { Value = gateEntity });
+                 ECB.AddComponent(e, new AgentConfiguration
+                 {
+                     Speed = 4,
+                     TargetGate = targetGate,
+                     ViewingDistance = 75,
+                     ViewingFilter = AgentAuthoring.ViewingFilter
+                 });
+                 ECB.AddComponent(e, new WallAvoidVector { Value = float2.zero });
+                 ECB.AddComponent(e, new ApplyImpulse { Direction = new float3(1, 0, 1) });
+                 ECB.AddComponent(e, new URPMaterialPropertyBaseColor { Value = new float4(1, 0, 0, 1) });  // Set color as desired
+
+                 // Initialize physics components
+                 ECB.SetComponent(e, new PhysicsMass { InverseMass = 1.0f, InverseInertia = new float3(1, 1, 1) });
+                 ECB.SetComponent(e, new PhysicsVelocity { Linear = float3.zero, Angular = float3.zero });
+                 ECB.SetComponent(e, new PhysicsDamping { Linear = 0.01f, Angular = 0.05f });
+             }
+         }
+     }
+ */
+    private unsafe Entity InitializeAgent(EntityManager entityManager, float3 position, quaternion orientation, float radius, float mass)
+{
+    // Create a new entity
+    Entity entity = entityManager.CreateEntity();
+
+    // Add LocalTransform and LocalToWorld for positioning and world-space representation
+    entityManager.AddComponentData(entity, new LocalTransform
+    {
+        Position = position,
+        Rotation = orientation,
+        Scale = 1f
+    });
+    entityManager.AddComponentData(entity, new LocalToWorld());
+
+    // Add RenderBounds to define the visible bounds of the entity (important for rendering culling)
+    entityManager.AddComponentData(entity, new RenderBounds
+    {
+        Value = new AABB
+        {
+            Center = float3.zero,
+            Extents = new float3(0.5f, 0.5f, 0.5f)
         }
-    }
-*/
-    protected override void OnUpdate() {
+    });
+
+    // Add a sphere collider for physics
+    CapsuleGeometry sphereGeometry = new CapsuleGeometry
+    {
+        Vertex0 =  new float3(0f, -0.5f, 0f),
+        Vertex1 =  new float3(0f, 0.5f, 0f),
+        Radius = radius
+        
+    };
+    BlobAssetReference<Unity.Physics.Collider> capsualCollider = Unity.Physics.CapsuleCollider.Create(sphereGeometry, CollisionFilter.Default);
+
+    
+   
+ 
+     entityManager.AddComponentData(entity, new PhysicsCollider { Value = capsualCollider });
+
+    // Add PhysicsWorldIndex to specify which physics world the entity belongs to
+    entityManager.AddSharedComponentManaged(entity, new PhysicsWorldIndex { Value = 0 });
+   // capsualCollider.Value.MassProperties.MassDistribution.InertiaTensor = new float3(0, 1, 0);
+    // Add PhysicsMass component using mass properties from the collider
+    Collider* colliderPtr = (Collider*)capsualCollider.GetUnsafePtr();
+    
+    //  entityManager.AddComponentData(entity, PhysicsMass.CreateDynamic( colliderPtr->MassProperties, mass));
+    var physicsMass = PhysicsMass.CreateDynamic(colliderPtr->MassProperties, mass);
+
+    // Modify InverseInertia to lock rotation around X and Z axes, allowing only Y-axis rotation
+    physicsMass.InverseInertia = new float3(0f, physicsMass.InverseInertia.y, 0f);
+  
+    entityManager.AddComponentData(entity, physicsMass);
+   
+    
+    
+    // Add PhysicsVelocity for initial linear and angular velocity
+    entityManager.AddComponentData(entity, new PhysicsVelocity
+    {
+        Linear = float3.zero,
+        Angular = float3.zero
+    });
+
+    // Add PhysicsDamping to smooth out movement
+    entityManager.AddComponentData(entity, new PhysicsDamping
+    {
+        Linear = 0.01f,
+        Angular = 0.05f
+    });
+
+    // Add PhysicsGravityFactor to specify gravity behavior
+    entityManager.AddComponentData(entity, new PhysicsGravityFactor { Value = 1 });
+
+    return entity;
+}
+    
+    protected override void OnUpdate()
+    {
         float deltaTime = SystemAPI.Time.DeltaTime;
         //Debug.Log($"I am supposed to spawn some agents I think.");
 
-        
+
         // Schedule the gate delay update job
         var gateTimeJob = new UpdateGateTimeJob { DeltaTime = deltaTime };
         Dependency = gateTimeJob.ScheduleParallel(Dependency);
@@ -124,13 +240,15 @@ public partial class AgentSpawing : SystemBase {
         int gateCount = m_ActiveGatesCount.CalculateEntityCount();
         int targetAgentCount = SimVal.MaxAgents;
         int diff = targetAgentCount - agentCount;
-        Debug.Log($"I am supposed to spawn {diff} Agents");
-        if (diff <= 0 && gateCount==0) {
+
+
+        if (diff <= 0 || gateCount == 0)
+        {
             return; // No agents need to be spawned
         }
-        
 
-     
+        Debug.Log($"I am supposed to spawn {diff} Agents");
+
 
         var avalibleGates = new HashSet<GateNums>();
 
@@ -140,38 +258,22 @@ public partial class AgentSpawing : SystemBase {
 
         // Prepare spawn configurations
         List<SpawnConfig> spawnConfigs = PrepareSpawnConfigs(diff, avalibleGates);
-       // Entity prefab = SystemAPI.GetSingleton<AgentPrefab>().Value;
-       AgentSprite = Resources.Load<Texture2D>("Textures/AgentSprite");  // Loads from Assets/Resources/AgentSprite.png
+        // Entity prefab = SystemAPI.GetSingleton<AgentPrefab>().Value;
        
-       if (AgentSprite == null)
-       {
-           Debug.LogError("Sprite not found in Resources folder!");
-           return;
-       }
-       var quadMesh = Resources.Load<Mesh>("Quad"); // Ensure this exists in Assets/Resources/QuadMesh.asset
-       if (quadMesh == null)
-       {
-           Debug.LogError("Quad mesh not found in Resources folder!");
-           return;
-       }
-       
-        // Spawn agents synchronously using the archetype
-        foreach (var config in spawnConfigs) {
 
+        // Spawn agents synchronously using the archetype
+        foreach (var config in spawnConfigs)
+        {
             //var agent = EntityManager.CreateEntity(AgentArchetypeManager.AgentArchetype);
             //var agent = EntityManager.Instantiate(prefab);
-            Entity agent = EntityManager.CreateEntity();
+            Entity agent = InitializeAgent(EntityManager, config.Position, config.Rotation, 1, 1);
 
-            float3 scale = new float3(1f, 1f, 1f);  // Adjust scale if needed
-            float4x4 worldTransform = float4x4.TRS(config.Position, config.Rotation, scale);
-            EntityManager.AddComponentData(agent, new LocalToWorld { Value = worldTransform });
-            
-            
-           // EntityManager.AddComponentData(agent, new LocalTransform {
-       //         Position = config.Position,
-        //        Rotation = config.Rotation
-       //     });
-            EntityManager.AddComponentData(agent, new AgentConfiguration {
+           // float3 scale = new float3(1f, 1f, 1f); // Adjust scale if needed
+            //float4x4 worldTransform = float4x4.TRS(config.Position, config.Rotation, scale);
+            //EntityManager.AddComponentData(agent, new LocalToWorld { Value = worldTransform });
+         
+            EntityManager.AddComponentData(agent, new AgentConfiguration
+            {
                 Speed = 4,
                 TargetGate = config.TargetGate,
                 ViewingDistance = 75,
@@ -180,40 +282,25 @@ public partial class AgentSpawing : SystemBase {
             EntityManager.AddComponentData(agent, new WalkingTag());
             EntityManager.AddComponentData(agent, new StartGateEntity { Value = Entity.Null });
             EntityManager.AddComponentData(agent, new WallAvoidVector { Value = float2.zero });
-            EntityManager.AddComponentData(agent, new ApplyImpulse { Direction = new float3(1, 0, 1) });
-            EntityManager.AddComponentData(agent,
-                new PhysicsMass { InverseMass = 1.0f, InverseInertia = new float3(1, 1, 1) });
-            EntityManager.AddComponentData(agent, new PhysicsVelocity { Linear = float3.zero, Angular = float3.zero });
-            EntityManager.AddComponentData(agent, new PhysicsDamping { Linear = 0.01f, Angular = 0.05f });
             EntityManager.AddComponentData(agent, new AgentLazyness { active = true });
             EntityManager.AddComponentData(agent, new GateJobResults { Direction = float3.zero });
             EntityManager.AddComponentData(agent,
                 new BoidJobResults()
                     { avoid = float3.zero, algin = float3.zero, avoid_OPP = float3.zero, algin_OPP = float3.zero });
-            EntityManager.AddComponentData(agent, new URPMaterialPropertyBaseColor{Value = new float4(1,1,1,1)});
+            
+            
+            EntityManager.AddComponentData(agent, new ApplyImpulse { Direction = new float3(1, 0, 1) });
+            
+            EntityManager.AddComponentData(agent, new URPMaterialPropertyBaseColor { Value = new float4(1, 1, 1, 1) });
             Debug.Log(agent.ToString());
             Debug.Log($"I added a Agent at {config.Position}");
 
-            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.mainTexture = AgentSprite;
-            material.SetFloat("_Surface", 0.5f); // 1 = Transparent, 0 = Opaque
-            material.SetFloat("_AlphaClip", 0.5f); // Enables alpha clipping
-            material.color = Color.white; // Ensure it’s a visible color
-
-            var renderMeshDescription = new RenderMeshDescription(
-                shadowCastingMode: UnityEngine.Rendering.ShadowCastingMode.Off,
-                receiveShadows: false);
-
+            RenderMeshUtility.AddComponents(agent, EntityManager, renderMeshDescription, renderMeshArray,
+                MaterialMeshInfo.FromRenderMeshArrayIndices(0, 0));
             
-            Debug.Log($"check the mesh {quadMesh } : {quadMesh.vertexCount}");
-            // Create a RenderMeshArray
-            var renderMeshArray = new RenderMeshArray(new[] { material }, new Mesh[] { quadMesh },
-                new MaterialMeshIndex[]{new MaterialMeshIndex(){MaterialIndex = 0,MeshIndex = 0,SubMeshIndex = 0}});
-
-            RenderMeshUtility.AddComponents(agent, EntityManager, renderMeshDescription, renderMeshArray,MaterialMeshInfo.FromRenderMeshArrayIndices(0,0));
         }
-        
     }
+
     private Mesh GenerateQuadMesh()
     {
         var mesh = new Mesh();
@@ -235,18 +322,19 @@ public partial class AgentSpawing : SystemBase {
         mesh.RecalculateNormals();
         return mesh;
     }
+
     private List<SpawnConfig> PrepareSpawnConfigs(int count, HashSet<GateNums> avalibleGates)
     {
         var spawnConfigs = new List<SpawnConfig>();
         List<GateNums> availableTargets = avalibleGates.ToList();
-        
+
         // Generate random configurations
         for (int i = 0; i < count; i++)
         {
             GateNums targetGate = availableTargets[generator.NextInt(availableTargets.Count)];
-            quaternion randomRotation = quaternion.Euler(0, generator.NextFloat(-math.PI / 4, math.PI / 4), 0);
-            //float3 randomPosition = new float3(generator.NextFloat(-10f, 10f), 1, generator.NextFloat(-10f, 10f));
-            float3 randomPosition = new float3(generator.NextFloat(-1, 1f), 1, generator.NextFloat(-1f, 1f));
+            quaternion randomRotation = quaternion.Euler(0, generator.NextFloat(-math.PI , math.PI ), 0);
+            float3 randomPosition = new float3(generator.NextFloat(-10f, 10f), 1, generator.NextFloat(-10f, 10f));
+            //float3 randomPosition = new float3(generator.NextFloat(-1, 1f), 1, generator.NextFloat(-1f, 1f));
 
             spawnConfigs.Add(new SpawnConfig
             {
@@ -259,12 +347,13 @@ public partial class AgentSpawing : SystemBase {
 
         return spawnConfigs;
     }
+
     private struct SpawnConfig
     {
         public GateNums TargetGate;
         public float3 Position;
-        public quaternion Rotation;
-       // public Entity GateEntity;
-    }
 
+        public quaternion Rotation;
+        // public Entity GateEntity;
+    }
 }

@@ -12,7 +12,7 @@ using Unity.Physics.Systems;
 using UnityEngine;
 
 [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
-[UpdateBefore(typeof(PhysicsSystemGroup))]
+[UpdateAfter(typeof(PhysicsSystemGroup))]
 [BurstCompile]
 public partial struct AgentRayCast : ISystem
 {

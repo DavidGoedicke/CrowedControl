@@ -29,7 +29,9 @@ public partial struct ApplyAgentMotion : ISystem {
     }
 
     // [BurstCompile]
-    public void OnUpdate(ref SystemState state) {
+    public void OnUpdate(ref SystemState state)
+    {
+        return;
         // var tmp = GameController.Singelton.SimParams.MotionIsRunning;
         state.Dependency = new ApplyAgentImpulseJob {
             DeltaTime = SystemAPI.Time.DeltaTime
